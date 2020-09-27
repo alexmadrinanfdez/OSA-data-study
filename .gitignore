@@ -1,12 +1,9 @@
-# all files in this directory
+# all files in these directories
 presentations/
+data/
 
 # R usage
 code_r/.Rhistory
-
-# all content inside
-code_r/*
-data/*
 
 # except for
 !data/Info_BDApnea_QuironMalaga.xlsx
