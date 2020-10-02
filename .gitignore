@@ -3,7 +3,7 @@ presentations/
 data/
 
 # R usage
-code_r/.Rhistory
+R/.Rhistory
 
 # except for
 !data/Info_BDApnea_QuironMalaga.xlsx
