@@ -43,23 +43,32 @@ df_tmp <-
       height = Talla,
       age = Edad,
       cervical = PerCervical,
-      smoker = Fumador # aditional predictor
+      smoker = Fumador, # additional predictor
+      snorer = Roncador # additional predictor
       )
 
 vis_dat(df_tmp) # at-a-glance ggplot object of what is inside a dataframe
+# change all -1 values for NA
+df_tmp <- df_tmp %>% replace_with_na_all(condition = ~.x == -1)
+# remove anything that is not a number in variable weight
+df_tmp <- df_tmp %>% mutate(weight = str_remove_all(weight, "[^[:digit:]]"))
+df_tmp <- df_tmp %>% mutate(weight = as.numeric(weight))
+# unify responses in factors
+# str_replace(string, pattern, replacement)
+# df_tmp <- df_tmp %>% mutate(smoker = str_replace(smoker, 'poco', 'si'))
+df_tmp <- df_tmp %>% mutate(snorer = str_replace(snorer, 'no con CPAD','CPAP'))
+df_tmp <- df_tmp %>% mutate(snorer = str_replace(snorer, 'si sin CPAP', 'CPAP'))
+df_tmp <- df_tmp %>% mutate(snorer = str_replace(snorer, 'poco', 'si'))
 
-df_tmp <- df_tmp %>% replace_with_na_all(condition = ~.x == -1) # change all -1 values for NA
-df_tmp <- df_tmp %>% mutate(weight = as.numeric(weight))        # coerce char values to NA
 # df_tmp <- df_tmp %>% replace_with_na(replace = list(smoker = "ns"))
+
 df <- df_tmp %>% drop_na()                                      # drop rows containing missing values
 
 df <- 
   df %>% 
     mutate(
       patient = str_trunc(patient, width = 3, side = "left", ellipsis = ""),
-      gender = as.factor(gender),      # gender as a two-level factor
       BMI = weight / (height / 100)^2, # new column BMI = [kg]/[m]^2
-      smoker = as.factor(smoker)
       )
 
 ## load ##

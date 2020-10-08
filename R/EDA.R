@@ -15,7 +15,8 @@ df <- as.data.frame(df)
 df <- 
   df %>% mutate(
     gender = as.factor(gender),
-    smoker = as.factor(smoker)
+    smoker = as.factor(smoker),
+    snorer = as.factor(snorer)
   ) %>% select(patient, IAH, everything())
 
 dim(df)
@@ -39,8 +40,8 @@ par(op)
 op <- par(mfcol = c(2,2))
 qqplot(IAH, rpois(length(IAH), lambda = 1), ylab = 'Poisson (lambda = 1)')
 hist(log(IAH), breaks = 30)
-qqplot(BMI, rpois(length(BMI), lambda = mean(BMI)), ylab = 'Poisson')
-hist(log(BMI), breaks = 30)
+qqplot(BMI, rt(length(BMI), df = 4, ncp = 2), ylab = 'Student t (df = 4, ncp = 2)')
+# hist(log(BMI), breaks = 30)
 par(op)
 
 # normal distributions
@@ -55,42 +56,49 @@ qqnorm(age, main = 'Age')
 qqline(age, col = "darkgoldenrod")
 qqnorm(cervical, main = 'Cervical')
 qqline(cervical, col = "darkgoldenrod")
-qqnorm(log(BMI), main = 'BMI')
+# qqnorm(log(BMI), main = 'BMI')
 qqline(log(BMI), col = "darkgoldenrod")
 par(op)
 
 # analyze factors differently
-gender.tbl <- table(gender)
-smoker.tbl <- table(smoker)
-op <- par(mfrow = c(1,2))
-pie(gender.tbl, main = 'gender')
-pie(smoker.tbl, main = 'smoker')
+op <- par(mfrow = c(1,3))
+pie(table(gender), main = 'gender')
+pie(table(smoker), main = 'smoker')
+pie(table(snorer), main = 'snorer')
 par(op)
 
-coplot(IAH ~ patient | gender)
-coplot(IAH ~ patient | smoker, rows = 1)
-coplot(IAH ~ patient | smoker + gender)
+coplot(IAH ~ patient | gender, pch = 20, col = "#009E73")
+coplot(IAH ~ patient | smoker, rows = 1, pch = 20, col = "#009E73")
+coplot(IAH ~ patient | snorer, rows = 1, pch = 20, col = "#009E73")
+coplot(IAH ~ patient | smoker + gender, pch = 20, col = "#009E73")
+coplot(IAH ~ patient | snorer + gender, pch = 20, col = "#009E73")
+coplot(IAH ~ patient | smoker + snorer, pch = 20, col = "#009E73")
 
-barplot(table(smoker[gender == "hombre"]))
-barplot(table(smoker[gender == "mujer"]))
+op <- par(mfrow = c(2,2))
+barplot(table(smoker[gender == "hombre"]), main = 'smoker M')
+barplot(table(smoker[gender == "mujer"]), main = 'smoker F')
+barplot(table(snorer[gender == "hombre"]), main = 'snorer M')
+barplot(table(snorer[gender == "mujer"]), main = 'snorer F')
+par(op)
 
 detach(df)
 
 # correlations (linear relationship)
-pairs(~ IAH + weight + height + age + cervical + BMI, data = df)
-pairs(~ IAH + age + cervical + BMI, data = df)
+pairs(~ IAH + weight + height + age + cervical + BMI, data = df, pch = 20, col = "darkblue")
+pairs(~ IAH + age + cervical + BMI, data = df, pch = 20, col = "darkblue")
 op <- par(mfrow = c(2, 3))
-plot(IAH ~ age + cervical + BMI, data = df)
-plot(log(IAH) ~ age + cervical + BMI, data = df)
+plot(IAH ~ age + cervical + BMI, data = df, pch = 19, col = palette.colors(1, alpha = 0.2))
+plot(log(IAH) ~ age + cervical + BMI, data = df, pch = 19, col = palette.colors(1, alpha = 0.2))
 par(op)
-op <- par(mfrow = c(1,2))
-plot(IAH ~ gender + smoker)
+op <- par(mfrow = c(1,3))
+plot(IAH ~ gender + smoker + snorer, data = df)
 par(op)
 
 df_tmp <- 
   df %>% mutate(
     gender = as.numeric(gender),
     smoker = as.numeric(smoker),
+    snorer = as.numeric(snorer),
     log_IAH = log(IAH)
   )
 
