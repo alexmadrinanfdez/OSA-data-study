@@ -37,9 +37,15 @@ par(op)
 
 # non-normal distributions (Poisson)
 op <- par(mfcol = c(2,2))
-qqplot(AHI, rexp(n = length(AHI), rate = 1 / mean(AHI)), ylab = 'exponential distribution')
+qqplot(
+  AHI, rexp(n = length(AHI), rate = 1 / mean(AHI)),
+  ylab = 'exponential distribution'
+)
 hist(log1p(AHI), breaks = 30) # log1p(x) computes log(1+x)
-qqplot(BMI, rf(n = length(BMI), df1 = length(BMI), df2 = length(BMI), ncp = 2), ylab = 'F distribution (ncp = 2)')
+qqplot(
+  BMI, rf(n = length(BMI), df1 = length(BMI), df2 = length(BMI), ncp = 2),
+  ylab = 'F distribution (ncp = 2)'
+)
 hist(log(BMI), breaks = 30)
 par(op)
 
@@ -66,12 +72,13 @@ pie(table(smoker), main = 'smoker')
 pie(table(snorer), main = 'snorer')
 par(op)
 
-coplot(AHI ~ patient | gender, pch = 20, col = "#009E73")
-coplot(AHI ~ patient | smoker, rows = 1, pch = 20, col = "#009E73")
-coplot(AHI ~ patient | snorer, rows = 1, pch = 20, col = "#009E73")
+coplot(AHI ~ weight | gender, pch = 20, col = "#009E73")
+coplot(AHI ~ height | gender, pch = 20, col = "#009E73")
+coplot(AHI ~ age | gender, pch = 20, col = "#009E73")
+coplot(AHI ~ neck | gender, pch = 20, col = "#009E73")
 coplot(AHI ~ patient | smoker + gender, pch = 20, col = "#009E73")
 coplot(AHI ~ patient | snorer + gender, pch = 20, col = "#009E73")
-coplot(AHI ~ patient | smoker + snorer, pch = 20, col = "#009E73")
+coplot(AHI ~ BMI | gender, pch = 20, col = "#009E73")
 
 op <- par(mfrow = c(2,2))
 barplot(table(smoker[gender == "hombre"]), main = 'smoker M')
@@ -83,11 +90,23 @@ par(op)
 detach(df)
 
 # correlations (linear relationship)
-pairs(~ AHI + weight + height + age + neck + BMI, data = df, pch = 20, col = "darkblue")
-pairs(~ AHI + age + neck + BMI, data = df, pch = 20, col = "darkblue")
+pairs(
+  ~ AHI + weight + height + age + neck + BMI, data = df,
+  pch = 20, col = "darkblue"
+)
+pairs(
+  ~ AHI + age + neck + BMI, data = df,
+  pch = 20, col = "darkblue"
+)
 op <- par(mfrow = c(2, 3))
-plot(AHI ~ age + neck + BMI, data = df, pch = 19, col = palette.colors(1, alpha = 0.2))
-plot(log1p(AHI) ~ age + neck + BMI, data = df, pch = 19, col = palette.colors(1, alpha = 0.2))
+plot(
+  AHI ~ age + neck + BMI, data = df,
+  pch = 19, col = palette.colors(1, alpha = 0.2)
+)
+plot(
+  log1p(AHI) ~ age + neck + BMI, data = df,
+  pch = 19, col = palette.colors(1, alpha = 0.2)
+)
 par(op)
 op <- par(mfrow = c(1,3))
 plot(AHI ~ gender + smoker + snorer, data = df)
@@ -102,7 +121,17 @@ df_tmp <-
   )
 
 M <- cor(subset(df_tmp, select = - patient))
-corrplot(M, method = "pie", type = "lower", tl.srt = 45, tl.col = "darkblue")
-corrplot.mixed(M, tl.cex = 0.7, tl.col = "black")
+corrplot(
+  corr = M, method = "pie", type = "upper",
+  tl.pos = "d", tl.col = "black", tl.cex = 0.8
+)
+corrplot(
+  corr = M, type = "lower", method = "color",
+  number.cex = .7, add = TRUE,
+  addCoef.col = "white",      # add coefficient of correlation
+  tl.pos = "n", cl.pos = "n", # don't show text and color labels again
+  # hide correlation coefficient on the principal diagonal
+  diag = FALSE           
+)
 
 rm(df_tmp)
