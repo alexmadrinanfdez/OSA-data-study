@@ -2,7 +2,10 @@
 presentations/
 data/
 
+# report files
 report.*
+biblio.bibtex
+
 R/regression.R
 
 # R usage

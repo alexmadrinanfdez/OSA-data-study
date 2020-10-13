@@ -1,7 +1,6 @@
 # simple ETL process on a single Excel file
 
-# clear working space
-rm(list = ls())
+rm(list = ls())  # clear working space
 
 library(readxl)  # read Excel files
 library(dplyr)   # a grammar of data manipulation
@@ -38,11 +37,11 @@ df_tmp <-
     select(
       patient = Patient,
       gender = Gender,
-      IAH,
+      AHI = IAH,
       weight = Peso,
       height = Talla,
       age = Edad,
-      cervical = PerCervical,
+      neck = PerCervical,
       smoker = Fumador, # additional predictor
       snorer = Roncador # additional predictor
       )
@@ -62,13 +61,13 @@ df_tmp <- df_tmp %>% mutate(snorer = str_replace(snorer, 'poco', 'si'))
 
 # df_tmp <- df_tmp %>% replace_with_na(replace = list(smoker = "ns"))
 
-df <- df_tmp %>% drop_na()                                      # drop rows containing missing values
+df <- df_tmp %>% drop_na() # drop rows containing missing values
 
 df <- 
   df %>% 
     mutate(
       patient = str_trunc(patient, width = 3, side = "left", ellipsis = ""),
-      BMI = weight / (height / 100)^2, # new column BMI = [kg]/[m]^2
+      BMI = weight / (height / 100)^2, # new column BMI [kg / m^2]
       )
 
 ## load ##
