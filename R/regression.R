@@ -11,12 +11,11 @@ directory <- '../data'
 
 df <- read_excel(paste(directory, file, sep = "/"))
 df <- as.data.frame(df)
-df <- 
-  df %>% mutate(
-    gender = as.factor(gender),
-    smoker = as.factor(smoker),
-    snorer = as.factor(snorer)
-  ) %>% select(- patient)
+df <- df %>% mutate(
+  gender = as.factor(gender),
+  smoker = as.factor(smoker),
+  snorer = as.factor(snorer)
+) %>% select(- patient)
 
 glimpse(df)
 
@@ -160,7 +159,7 @@ summary(lm.it)
 
 ## non-linear transformations
 # function I() is needed since the ^ has a special meaning in a formula;
-# wrapping as we do allows the standard usage in R
+# wrapping allows the standard usage in R
 lm.nlt <- lm(formula = AHI ~ neck + I(neck^2), data = df)
 lm.log <- update(object = lm.it, formula. = log1p(AHI) ~ .)
 summary(lm.nlt)

@@ -11,16 +11,14 @@ directory <- '../data'
 
 df <- read_excel(paste(directory, file, sep = "/"))
 df <- as.data.frame(df)
-df <- 
-  df %>% mutate(
-    gender = as.factor(gender),
-    smoker = as.factor(smoker),
-    snorer = as.factor(snorer)
-  ) %>% select(patient, AHI, everything())
+df <- df %>% mutate(
+  gender = as.factor(gender),
+  smoker = as.factor(smoker),
+  snorer = as.factor(snorer)
+) %>% select(patient, AHI, everything())
 
 dim(df)
 glimpse(df)
-
 summary(df)
 
 attach(df) # database is attached to the R search path
@@ -81,13 +79,13 @@ coplot(AHI ~ patient | snorer + gender, pch = 20, col = "#009E73")
 coplot(AHI ~ BMI | gender, pch = 20, col = "#009E73")
 
 op <- par(mfrow = c(2,2))
-barplot(table(smoker[gender == "hombre"]), main = 'smoker M')
-barplot(table(smoker[gender == "mujer"]), main = 'smoker F')
-barplot(table(snorer[gender == "hombre"]), main = 'snorer M')
-barplot(table(snorer[gender == "mujer"]), main = 'snorer F')
+barplot(table(smoker[gender == "male"]), main = 'smoker M')
+barplot(table(smoker[gender == "female"]), main = 'smoker F')
+barplot(table(snorer[gender == "male"]), main = 'snorer M')
+barplot(table(snorer[gender == "female"]), main = 'snorer F')
 par(op)
 
-detach(df)
+detach(df) # database is detached from the R search path
 
 # correlations (linear relationship)
 pairs(
@@ -112,15 +110,15 @@ op <- par(mfrow = c(1,3))
 plot(AHI ~ gender + smoker + snorer, data = df)
 par(op)
 
-df_tmp <- 
-  df %>% mutate(
-    gender = as.numeric(gender),
-    smoker = as.numeric(smoker),
-    snorer = as.numeric(snorer),
-    log_AHI = log1p(AHI)
-  )
+df.num <- df %>% mutate(
+  gender = as.numeric(gender),
+  smoker = as.numeric(smoker),
+  snorer = as.numeric(snorer),
+  log_AHI = log1p(AHI)
+)
 
-M <- cor(subset(df_tmp, select = - patient))
+M <- cor(subset(df.num, select = - patient))
+
 corrplot(
   corr = M, method = "pie", type = "upper",
   tl.pos = "d", tl.col = "black", tl.cex = 0.8
@@ -133,5 +131,3 @@ corrplot(
   # hide correlation coefficient on the principal diagonal
   diag = FALSE           
 )
-
-rm(df_tmp)
