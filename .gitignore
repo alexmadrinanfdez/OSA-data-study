@@ -6,8 +6,9 @@ data/
 report.*
 biblio.bibtex
 
-# R usage
+# usage
 R/.Rhistory
+README.html
 
 # except for
 !data/Info_BDApnea_QuironMalaga.xlsx
