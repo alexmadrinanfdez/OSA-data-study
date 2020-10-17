@@ -51,7 +51,7 @@ df <- df %>% replace_with_na_all(condition = ~.x == -1)
 # remove anything that is not a number in variable weight
 df <- df %>% mutate(
   weight = str_remove_all(weight, "[^[:digit:]]"),
-  weight = as.numeric(weight)
+  weight = as.numeric(weight) # empty strings ("") convert to NA
 )
 # str_replace(string, pattern, replacement)
 # unify responses in factors
@@ -80,9 +80,26 @@ df <- df %>% drop_na() # drop rows containing missing values
 df <- df %>% mutate(
   patient = str_trunc(patient, width = 3, side = "left", ellipsis = ""),
   BMI = weight / (height / 100)^2, # new column BMI [kg / m^2]
+  diagnosis = if_else(             # new column for classification
+    condition = AHI < 5,
+    true = 'normal',
+    false = if_else(
+      condition = (AHI >= 5) & (AHI < 15),
+      true = 'mild',
+      false = if_else(
+        condition = (AHI >= 15) & (AHI < 30),
+        true = 'moderate',
+        false = 'severe'
+      )
+    )
+  )
 )
 
 ## load ##
 
 write_xlsx(df,
            paste(directory, o_file, sep = "/" ))
+
+# df.m <- subset(x = df, subset = gender == 'male')
+# df.m <- df.m %>% filter(diagnosis != "mild" | diagnosis != "moderate")
+# df.m <- df.m %>% mutate(diagnosis = as.factor(diagnosis))
