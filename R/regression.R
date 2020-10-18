@@ -15,7 +15,7 @@ df <- df %>% mutate(
   gender = as.factor(gender),
   smoker = as.factor(smoker),
   snorer = as.factor(snorer)
-) %>% select(- patient)
+) %>% select(- c(patient, diagnosis)) %>% select(AHI, everything())
 
 glimpse(df)
 
@@ -78,8 +78,7 @@ abline(lm.BMI, lty = 2, col= "darkblue")
 par(op)
 detach(df)
 
-op <- par(mfrow = c(1, 3))
-plot( # residual standard error (deviation)
+sigma <- sort(
   c(
     1 / sigma(lm.gender),
     1 / sigma(lm.weight),
@@ -89,11 +88,9 @@ plot( # residual standard error (deviation)
     1 / sigma(lm.smoker),
     1 / sigma(lm.snorer),
     1 / sigma(lm.BMI)
-  ), 
-  xaxt = "n", ylab = '1 / RSE', xlab = '', pch = 7, col = 1:8
+  ), index.return = TRUE
 )
-axis(1, at = 1:8, labels = names(df)[-2])
-plot( # R squared (R^2)
+r.sq <- sort(
   c(
     summary(lm.gender)$r.sq,
     summary(lm.weight)$r.sq,
@@ -103,11 +100,9 @@ plot( # R squared (R^2)
     summary(lm.smoker)$r.sq,
     summary(lm.snorer)$r.sq,
     summary(lm.BMI)$r.sq
-    ),
-  xaxt = "n", ylab = 'R-squared', xlab = '', pch = 7, col = 1:8
+  ), index.return = TRUE
 )
-axis(1, at = 1:8, labels = names(df)[-2])
-plot( # F statistic
+f <- sort(
   c(
     summary(lm.gender)$fstatistic[1],
     summary(lm.weight)$fstatistic[1],
@@ -117,10 +112,28 @@ plot( # F statistic
     summary(lm.smoker)$fstatistic[1],
     summary(lm.snorer)$fstatistic[1],
     summary(lm.BMI)$fstatistic[1]
-  ), 
-  xaxt = "n", ylab = 'F-statistic', xlab = '', pch = 7, col = 1:8
+  ), index.return = TRUE
 )
-axis(1, at = 1:8, labels = names(df)[-2])
+
+op <- par(mfrow = c(1, 3))
+plot( # residual standard error (deviation)
+  x = sigma$x, 
+  type = "b", xaxt = "n", ylab = '1 / RSE', xlab = '', 
+  pch = 7, col = 1:8, lty = 2
+)
+axis(1, at = 1:8, labels = names(df)[1 + sigma$ix])
+plot( # R squared (R^2)
+  x = r.sq$x, 
+  type = "b", xaxt = "n", ylab = 'R-squared', xlab = '', 
+  pch = 7, col = 1:8, lty = 2
+)
+axis(1, at = 1:8, labels = names(df)[1 + r.sq$ix])
+plot( # F statistic
+  x = f$x, 
+  type = "b", xaxt = "n", ylab = 'F-statistic', xlab = '', 
+  pch = 7, col = 1:8, lty = 2
+)
+axis(1, at = 1:8, labels = names(df)[1 + f$ix])
 par(op)
 
 summary(lm.neck)
@@ -167,3 +180,5 @@ summary(lm.log)
 
 anova(lm.neck, lm.fit, lm.bckwd, lm.bang, lm.it, lm.nlt) # can't compare lm.log
 anova(lm.fit, lm.it, lm.nlt)
+
+# rfs(model)

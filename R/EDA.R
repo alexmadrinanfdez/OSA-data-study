@@ -5,6 +5,8 @@ rm(list = ls())   # clear working space
 library(readxl)   # read Excel files
 library(dplyr)    # a grammar of data manipulation
 library(corrplot) # visualization of a correlation matrix
+library(lattice)  # Trellis graphics for R
+library(ggplot2)  # create elegant data visualisations using the grammar of graphics
 
 file <- 'DB.xlsx'
 directory <- '../data'
@@ -14,8 +16,9 @@ df <- as.data.frame(df)
 df <- df %>% mutate(
   gender = as.factor(gender),
   smoker = as.factor(smoker),
-  snorer = as.factor(snorer)
-) %>% select(patient, AHI, everything())
+  snorer = as.factor(snorer),
+  diagnosis = as.factor(diagnosis)
+) %>% select(patient, AHI, diagnosis, everything())
 
 dim(df)
 glimpse(df)
@@ -33,8 +36,8 @@ hist(neck)
 hist(BMI, breaks = 20)
 par(op)
 
-# non-normal distributions (Poisson)
-op <- par(mfcol = c(2,2))
+# non-normal distributions
+op <- par(mfcol = c(2, 2))
 qqplot(
   AHI, rexp(n = length(AHI), rate = 1 / mean(AHI)),
   ylab = 'exponential distribution'
@@ -64,28 +67,111 @@ qqline(log(BMI), col = "darkgoldenrod")
 par(op)
 
 # analyze factors differently
-op <- par(mfrow = c(1,3))
+op <- par(mfrow = c(1, 4))
 pie(table(gender), main = 'gender')
 pie(table(smoker), main = 'smoker')
 pie(table(snorer), main = 'snorer')
+pie(table(diagnosis), main = 'diagnosis')
 par(op)
 
-coplot(AHI ~ weight | gender, pch = 20, col = "#009E73")
-coplot(AHI ~ height | gender, pch = 20, col = "#009E73")
-coplot(AHI ~ age | gender, pch = 20, col = "#009E73")
-coplot(AHI ~ neck | gender, pch = 20, col = "#009E73")
-coplot(AHI ~ patient | smoker + gender, pch = 20, col = "#009E73")
-coplot(AHI ~ patient | snorer + gender, pch = 20, col = "#009E73")
-coplot(AHI ~ BMI | gender, pch = 20, col = "#009E73")
-
-op <- par(mfrow = c(2,2))
+op <- par(mfcol = c(2, 3))
 barplot(table(smoker[gender == "male"]), main = 'smoker M')
 barplot(table(smoker[gender == "female"]), main = 'smoker F')
 barplot(table(snorer[gender == "male"]), main = 'snorer M')
 barplot(table(snorer[gender == "female"]), main = 'snorer F')
+barplot(table(diagnosis[gender == "male"]), main = 'diagnosis M')
+barplot(table(diagnosis[gender == "female"]), main = 'diagnosis F')
 par(op)
 
 detach(df) # database is detached from the R search path
+
+ggplot(data = df, mapping = aes(x = gender, y = diagnosis)) + 
+  geom_count()
+
+coplot(AHI ~ patient | smoker + gender, data = df, pch = 20, col = "#009E73")
+coplot(AHI ~ patient | snorer + gender, data = df, pch = 20, col = "#009E73")
+
+xyplot(AHI ~ weight | gender, data = df)
+xyplot(AHI ~ height | gender, data = df)
+xyplot(AHI ~ age | gender, data = df)
+xyplot(AHI ~ neck | gender, data = df)
+xyplot(AHI ~ BMI | gender, data = df)
+xyplot(
+  x = weight ~ height, data = df, groups = gender,
+  pch = 19, alpha = 0.2,
+  auto.key = list(corner = c(1, 0), cex = 0.7, points = FALSE, rectangles = TRUE)
+)
+
+xyplot(BMI ~ age | diagnosis, data = df)
+xyplot(neck ~ BMI | diagnosis, data = df)
+xyplot(
+  x = neck ~ BMI, groups =  diagnosis, data = df,
+  pch = c(0, 4, 4, 0), alpha = c(0.75, 0.25, 0.25, 0.75),
+  auto.key = list(columns = 4, points = FALSE, lines = TRUE)
+)
+xyplot(
+  x = neck ~ BMI | gender, groups =  diagnosis, data = df,
+  pch = c(0, 4, 4, 0), alpha = c(0.75, 0.25, 0.25, 0.75),
+  auto.key = list(columns = 4, points = FALSE, lines = TRUE)
+)
+
+# ggplot(data = <DATA>) + 
+#   <GEOM_FUNCTION>(
+#     mapping = aes(<MAPPINGS>),
+#     stat = <STAT>, 
+#     position = <POSITION>
+#   ) +
+#   <COORDINATE_FUNCTION> +
+#   <FACET_FUNCTION>
+
+ggplot(mapping = aes(x = age), data = df) +
+  geom_histogram(
+    aes(color = diagnosis, fill = diagnosis),
+    position = "identity",
+    alpha = 0.1
+  )
+
+df %>% 
+  filter(diagnosis == "normal" | diagnosis == "severe") %>%
+  ggplot(mapping = aes(x = age), data = df) +
+  geom_histogram(
+    aes(color = diagnosis, fill = diagnosis),
+    position = "identity",
+    alpha = 0.1
+  ) +
+  scale_color_manual(values = c("#00AF00", "#E7B800")) +
+  scale_fill_manual(values = c("#00AF00", "#E7B800"))
+df %>% 
+  filter(diagnosis == "normal" | diagnosis == "severe") %>%
+  ggplot(mapping = aes(x = neck), data = df) +
+    geom_histogram(
+      aes(color = diagnosis, fill = diagnosis),
+      position = "identity",
+      alpha = 0.1
+    ) +
+  scale_color_manual(values = c("#00AF00", "#E7B800")) +
+  scale_fill_manual(values = c("#00AF00", "#E7B800"))
+df %>% 
+  filter(diagnosis == "normal" | diagnosis == "severe") %>%
+  ggplot(mapping = aes(x = BMI), data = df) +
+    geom_histogram(
+      aes(color = diagnosis, fill = diagnosis),
+      position = "identity",
+      alpha = 0.1
+    ) +
+    scale_color_manual(values = c("#00AF00", "#E7B800")) +
+    scale_fill_manual(values = c("#00AF00", "#E7B800"))
+df %>% 
+  filter(diagnosis == "normal" | diagnosis == "severe") %>%
+  ggplot(mapping = aes(x = gender), df) +
+    geom_histogram(
+      aes(color = diagnosis, fill = diagnosis),
+      position = "identity",
+      stat = "count",
+      alpha = 0.1
+    ) +
+    scale_color_manual(values = c("#00AF00", "#E7B800")) +
+    scale_fill_manual(values = c("#00AF00", "#E7B800"))
 
 # correlations (linear relationship)
 pairs(
@@ -115,9 +201,9 @@ df.num <- df %>% mutate(
   smoker = as.numeric(smoker),
   snorer = as.numeric(snorer),
   log_AHI = log1p(AHI)
-)
+) %>% select(- c(patient, diagnosis))
 
-M <- cor(subset(df.num, select = - patient))
+M <- cor(df.num)
 
 corrplot(
   corr = M, method = "pie", type = "upper",
