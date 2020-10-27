@@ -97,9 +97,4 @@ df <- df %>% mutate(
 
 ## load ##
 
-write_xlsx(df,
-           paste(directory, o_file, sep = "/" ))
-
-# df.m <- subset(x = df, subset = gender == 'male')
-# df.m <- df.m %>% filter(diagnosis != "mild" | diagnosis != "moderate")
-# df.m <- df.m %>% mutate(diagnosis = as.factor(diagnosis))
+write_xlsx(df, paste(directory, o_file, sep = "/" ))

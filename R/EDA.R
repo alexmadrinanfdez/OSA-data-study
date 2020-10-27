@@ -192,7 +192,7 @@ plot(
   pch = 19, col = palette.colors(1, alpha = 0.2)
 )
 par(op)
-op <- par(mfrow = c(1,3))
+op <- par(mfrow = c(1, 3))
 plot(AHI ~ gender + smoker + snorer, data = df)
 par(op)
 
