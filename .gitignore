@@ -2,7 +2,6 @@
 presentations/
 data/
 
-R/design.R
 R/prediction.R
 
 # report files
