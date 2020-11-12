@@ -4,6 +4,7 @@ rm(list = ls())   # clear working space
 
 library(readxl)   # read Excel files
 library(dplyr)    # a grammar of data manipulation
+library(naniar)   # # data structures, summaries, and visualisations for missing data
 library(lattice)  # Trellis graphics for R
 library(caTools)  # tools: moving window statistics, GIF, base64, ROC AUC, etc
 
@@ -12,12 +13,18 @@ directory <- '../data'
 
 df.tot <- read_excel(paste(directory, file, sep = "/"))
 df.tot <- as.data.frame(df.tot)
-df.tot <- df.tot %>% mutate(
-  gender = as.factor(gender),
-  smoker = as.factor(smoker),
-  snorer = as.factor(snorer),
-  diagnosis = as.factor(diagnosis)
-) %>% dplyr::select(- patient)
+df.tot <- df.tot %>% 
+  mutate(
+    gender = as.factor(gender),
+    smoker = as.factor(smoker),
+    snorer = as.factor(snorer),
+    diagnosis.full = as.factor(diagnosis)
+) %>% 
+  rename(diagnosis.simple = diagnosis) %>%
+  replace_with_na(replace = list(diagnosis.simple = c("mild", "moderate"))) %>%
+  mutate(diagnosis.simple = as.factor(diagnosis.simple)) %>%
+  dplyr::select(- patient)
+
 # comparison between gender populations
 df.male <- subset(x = df.tot, subset = gender == "male")
 df.female <- subset(x = df.tot, subset = gender == "female")
@@ -90,9 +97,14 @@ legend(x = "bottomright", legend = c('male', 'female'),
 
 ## prevalence problem
 op <- par(mfrow = c(1, 3))
-pie(table(df.tot$diagnosis), main = 'population sample')
-pie(table(df.male$diagnosis), main = 'male population')
-pie(table(df.female$diagnosis), main = 'female population')
+pie(table(df.tot$diagnosis.full), main = 'population sample')
+pie(table(df.male$diagnosis.full), main = 'male population')
+pie(table(df.female$diagnosis.full), main = 'female population')
+par(op)
+op <- par(mfrow = c(1, 3))
+pie(table(df.tot$diagnosis.simple), main = 'population sample')
+pie(table(df.male$diagnosis.simple), main = 'male population')
+pie(table(df.female$diagnosis.simple), main = 'female population')
 par(op)
 
 # beta values in predictors although it only ranges between 0 and 1

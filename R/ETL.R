@@ -53,6 +53,11 @@ df <- df %>% mutate(
   weight = str_remove_all(weight, "[^[:digit:]]"),
   weight = as.numeric(weight) # empty strings ("") convert to NA
 )
+# df <- df %>% replace_with_na(replace = list(smoker = "ns"))
+
+# na.omit()
+df <- df %>% drop_na() # drop rows containing missing values
+
 # str_replace(string, pattern, replacement)
 # unify responses in factors
 # df <- df %>% mutate(smoker = str_replace(smoker, 'poco', 'si'))
@@ -72,10 +77,6 @@ df <- df %>% mutate(
   snorer = str_replace(snorer, 'ns', 'na'),
   snorer = str_replace(snorer, 'si', 'yes')
 )
-
-# df <- df %>% replace_with_na(replace = list(smoker = "ns"))
-
-df <- df %>% drop_na() # drop rows containing missing values
 
 df <- df %>% mutate(
   patient = str_trunc(patient, width = 3, side = "left", ellipsis = ""),
