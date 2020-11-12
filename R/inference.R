@@ -1,20 +1,24 @@
 # supervised problem
 
-# regression
-# the task is to predict a target numerical value (AHI)
-
 rm(list = ls()) # clear working space
 
 library(readxl) # read Excel files
 library(dplyr)  # a grammar of data manipulation
 library(MASS)   # support functions and datasets for Venables and Ripley's MASS
 library(class)  # functions for classification
+library(leaps)  # regression subset selection
+library(glmnet) # lasso and elastic-net regularized generalized linear models
+library(pls)    # partial least squares and principal component regression
 
 file <- 'DB.xlsx'
 directory <- '../data'
 
 df <- read_excel(paste(directory, file, sep = "/"))
 df <- as.data.frame(df)
+
+# regression
+# the task is to predict a target numerical value (AHI)
+
 df.pred <- df %>% mutate(
   gender = as.factor(gender),
   smoker = as.factor(smoker),
@@ -27,8 +31,7 @@ df.pred.f <- subset(x = df.pred, subset = gender == "female")
 
 glimpse(df.pred)
 
-## linear model
-### simple
+# simple linear model
 lm.gender <- lm(AHI ~ gender, df.pred)
 lm.weight <- lm(AHI ~ weight, df.pred)
 lm.height <- lm(AHI ~ height, df.pred)
@@ -150,10 +153,10 @@ op <- par(mfrow =c(2, 2))
 plot(lm.neck)
 par(op)
 
-### multiple
+# multiple linear model
 lm.fit <- lm(formula = AHI ~ ., data = df.pred)
 summary(lm.fit)
-#### backward selection
+# backward selection
 lm.bckwd <- update(object = lm.fit, formula. = ~ . - smoker)
 summary(lm.bckwd)
 lm.bckwd <- update(object = lm.bckwd, formula. = ~ . - gender)
@@ -172,13 +175,13 @@ plot(lm.bckwd)
 plot(lm.bang)
 par(op)
 
-### interaction terms
+# interaction terms
 lm.it <- lm(formula = AHI ~ age * neck * BMI, data = df.pred)
 summary(lm.it)
 lm.it <- update(object = lm.it, formula. = ~ . - age:neck - age:BMI)
 summary(lm.it)
 
-### non-linear transformations
+# non-linear transformations
 # function I() is needed since the ^ has a special meaning in a formula;
 # wrapping allows the standard usage in R
 lm.nlt <- lm(formula = AHI ~ neck + I(neck^2), data = df.pred)
@@ -205,23 +208,104 @@ summary(lm.it.female)
 summary(lm.nlt.female)
 anova(lm.it.female, lm.nlt.female)
 
+# subset selection
+# best subset selection
+reg.sum <- summary(regsubsets(x = AHI ~ ., data = df.pred))
+op <- par(mfrow = c(2, 2))
+plot(x = reg.sum$rss, xlab = 'no. of variables', ylab = 'RSS', type = "b")
+plot(
+  x = reg.sum$adjr2, 
+  xlab = 'no. of variables', ylab = expression('adjusted R'^2), type = "b"
+)
+points(
+  x = which.max(reg.sum$adjr2), y = reg.sum$adjr2[which.max(reg.sum$adjr2)],
+  col = "red", pch = 20
+)
+plot(
+  x = reg.sum$cp, 
+  xlab = 'no. of variables', ylab = 'Cp', type = "b"
+)
+points(
+  x = which.min(reg.sum$cp), y = reg.sum$cp[which.min(reg.sum$cp)],
+  col = "red", pch = 20
+)
+plot(
+  x = reg.sum$bic, 
+  xlab = 'no. of variables', ylab = 'BIC', type = "b"
+)
+points(
+  x = which.min(reg.sum$bic), y = reg.sum$bic[which.min(reg.sum$bic)],
+  col = "red", pch = 20
+)
+par(op)
+# show which variables are in each model (same as summary)
+plot(x = regsubsets(x = AHI ~ ., data = df.pred), scale = "Cp")
+
+# bacward & forward stepwise selection
+summary(regsubsets(x = AHI ~ ., data = df.pred, method = "backward"))
+summary(regsubsets(x = AHI ~ ., data = df.pred, method = "forward"))
+
+# subset selection using validation approach
+train <- sample(
+  x = c(TRUE, FALSE), size = nrow(df.pred), replace = TRUE, prob = c(.7, .3)
+)
+test <- !train
+
+regfit <- regsubsets(x = AHI ~ ., data = df.pred[train,], nvmax = length(df.pred) - 1)
+matrix <- model.matrix(object = AHI ~ .,  data = df.pred[test,])
+error <- rep(x = NA, times = length(df.pred) - 1)
+for (i in 1:(length(df.pred) - 1)) {
+  ci <- coef(object = regfit, id = i)
+  pred <- matrix[,names(ci)] %*% ci # algebraic multiplication
+  error[i] <- mean((df.pred$AHI[test] - pred)^2) # MSE
+}
+
+coef(regsubsets(x = AHI ~ ., data = df.pred), id = which.min(errors)) # full data set
+
+# regularization (shrinkage methods)
+# glmnet(x, y, alpha = 1, nlambda = 100, lambda.min.ratio, lambda = NULL, standardize)
+x <- model.matrix(object = AHI ~ ., data = df.pred)[,-1] # exclude intercept
+y <- df.pred$AHI
+train <- sample(x = nrow(df.pred), size = nrow(df.pred)*2/3)
+test <- - train
+# ridge regression (alpha = 0)
+ridge <- glmnet(x = x[train,], y = y[train], alpha = 0, standardize = FALSE)
+mean((predict(object = ridge, s = 50, newx = x[test,]) - y[test])^2)
+
+# the lasso (alpha = 1)
+lasso <- glmnet(x = x[train,], y = y[train], alpha = 1, standardize = FALSE)
+mean((predict(object = lasso, s = 50, newx = x[test,]) - y[test])^2)
+
+op <- par(mfrow = c(1, 2))
+plot(ridge)
+plot(lasso)
+par(op)
+
+# Partial least squares (dimension reduction)
+# plsr(formula, subset, scale = FALSE, validation = c("none", "CV", "LOO"))
+pls.fit <- plsr(
+  formula = AHI ~ ., data = df.pred, subset = train, scale = FALSE, validation = "CV"
+)
+summary(pls.fit)
+validationplot(object = pls.fit, val.type = "RMSEP", legendpos = "topright")
+mean(predict(object = pls.fit, newdata = df.pred[test,], ncomp = 5))
+
+mean((mean(y[train]) - y[test])^2)
 # lattice::rfs(model = )
 
 # classification
 # the task is to predict a target categorical value (diagnosis)
 
-rm(list = ls()) # clear working space
+rm(f, r.sq, sigma, list = ls(pattern = 'lm')) # clear working space
 
 file <- 'DB.xlsx'
 directory <- '../data'
 
-df <- read_excel(paste(directory, file, sep = "/"))
-df <- as.data.frame(df)
 df.class <- df %>% 
   mutate(
     gender = as.factor(gender),
     smoker = as.factor(smoker),
-    snorer = as.factor(snorer),
+    snorer = as.factor(snorer)
   ) %>% 
   dplyr::select(- c(patient, AHI)) %>% 
   dplyr::select(diagnosis, everything()) %>%
@@ -234,8 +318,7 @@ glimpse(df.class)
 
 contrasts(df.class$diagnosis)
 
-## logistic regression (generalized linear model)
-### simple
+# simple logistic regression
 glm.gender <- glm(diagnosis ~ gender, binomial, df.class)
 glm.weight <- glm(diagnosis ~ weight, binomial, df.class)
 glm.height <- glm(diagnosis ~ height, binomial, df.class)
@@ -266,12 +349,12 @@ plot( # Akaike's an information criterion (aic)
 )
 axis(1, at = 1:8, labels = names(df.class)[1 + aic$ix])
 
-### multiple
+# multiple logistic regression
 glm.fit <- glm(formula = diagnosis ~ ., family = binomial, data = df.class)
 summary(glm.fit)
 summary(glm.fit)$coef
 coef(glm.fit)
-#### backward selection
+# backward selection
 glm.bckwd <- update(object = glm.fit, formula. = ~ . - smoker)
 summary(glm.bckwd)
 glm.bckwd <- update(object = glm.bckwd, formula. = ~ . - snorer)
@@ -285,11 +368,11 @@ op <- par(mfrow =c(2, 2))
 plot(glm.bckwd)
 par(op)
 
-## linear discriminant analysis
+# linear discriminant analysis
 lda.fit <- lda(formula = diagnosis ~ ., data = df.class)
 # lda.fit$svd
 
-## quadratic discriminant analysis
+# quadratic discriminant analysis
 # Uses a QR decomposition which will give an error message 
 # if the within-group variance is singular for any group
 qda.fit <- qda(
@@ -297,7 +380,7 @@ qda.fit <- qda(
   data = df.class.m
 )
 
-## k-nearest neighbors
+# k-nearest neighbors
 # can't be used for inference
 # already gives the result of the prediction
 
