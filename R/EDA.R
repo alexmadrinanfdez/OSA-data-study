@@ -17,7 +17,11 @@ df <- df %>% mutate(
   gender = as.factor(gender),
   smoker = as.factor(smoker),
   snorer = as.factor(snorer),
-  diagnosis = as.factor(diagnosis)
+  diagnosis = factor(
+    x = diagnosis,
+    levels = c("normal", "mild", "moderate", "severe"),
+    ordered = TRUE
+  )
 ) %>% select(patient, AHI, diagnosis, everything())
 
 dim(df)
@@ -88,6 +92,12 @@ detach(df) # database is detached from the R search path
 ggplot(data = df, mapping = aes(x = gender, y = diagnosis)) + 
   geom_count()
 
+ggplot(data = df, mapping = aes(x = smoker, y = diagnosis)) + 
+  geom_count()
+
+ggplot(data = df, mapping = aes(x = snorer, y = diagnosis)) + 
+  geom_count()
+
 coplot(AHI ~ patient | smoker + gender, data = df, pch = 20, col = "#009E73")
 coplot(AHI ~ patient | snorer + gender, data = df, pch = 20, col = "#009E73")
 
@@ -101,8 +111,13 @@ xyplot(
   pch = 19, alpha = 0.2,
   auto.key = list(corner = c(1, 0), cex = 0.7, points = FALSE, rectangles = TRUE)
 )
+xyplot(
+  x = AHI ~ neck, data = df, groups = gender,
+  pch = 19, alpha = 0.2,
+  auto.key = list(corner = c(0, 1), cex = 0.7, points = FALSE, rectangles = TRUE)
+)
 
-xyplot(BMI ~ age | diagnosis, data = df)
+xyplot(age ~ BMI | diagnosis, data = df)
 xyplot(neck ~ BMI | diagnosis, data = df)
 xyplot(
   x = neck ~ BMI, groups =  diagnosis, data = df,
@@ -110,7 +125,17 @@ xyplot(
   auto.key = list(columns = 4, points = FALSE, lines = TRUE)
 )
 xyplot(
+  x = age ~ BMI, groups =  diagnosis, data = df,
+  pch = c(0, 4, 4, 0), alpha = c(0.75, 0.25, 0.25, 0.75),
+  auto.key = list(columns = 4, points = FALSE, lines = TRUE)
+)
+xyplot(
   x = neck ~ BMI | gender, groups =  diagnosis, data = df,
+  pch = c(0, 4, 4, 0), alpha = c(0.75, 0.25, 0.25, 0.75),
+  auto.key = list(columns = 4, points = FALSE, lines = TRUE)
+)
+xyplot(
+  x = age ~ BMI | gender, groups =  diagnosis, data = df,
   pch = c(0, 4, 4, 0), alpha = c(0.75, 0.25, 0.25, 0.75),
   auto.key = list(columns = 4, points = FALSE, lines = TRUE)
 )
@@ -133,7 +158,7 @@ ggplot(mapping = aes(x = age), data = df) +
 
 df %>% 
   filter(diagnosis == "normal" | diagnosis == "severe") %>%
-  ggplot(mapping = aes(x = age), data = df) +
+  ggplot(mapping = aes(x = age)) +
   geom_histogram(
     aes(color = diagnosis, fill = diagnosis),
     position = "identity",
@@ -143,7 +168,7 @@ df %>%
   scale_fill_manual(values = c("#00AF00", "#E7B800"))
 df %>% 
   filter(diagnosis == "normal" | diagnosis == "severe") %>%
-  ggplot(mapping = aes(x = neck), data = df) +
+  ggplot(mapping = aes(x = neck)) +
     geom_histogram(
       aes(color = diagnosis, fill = diagnosis),
       position = "identity",
@@ -153,7 +178,7 @@ df %>%
   scale_fill_manual(values = c("#00AF00", "#E7B800"))
 df %>% 
   filter(diagnosis == "normal" | diagnosis == "severe") %>%
-  ggplot(mapping = aes(x = BMI), data = df) +
+  ggplot(mapping = aes(x = BMI)) +
     geom_histogram(
       aes(color = diagnosis, fill = diagnosis),
       position = "identity",
@@ -163,7 +188,7 @@ df %>%
     scale_fill_manual(values = c("#00AF00", "#E7B800"))
 df %>% 
   filter(diagnosis == "normal" | diagnosis == "severe") %>%
-  ggplot(mapping = aes(x = gender), df) +
+  ggplot(mapping = aes(x = gender)) +
     geom_histogram(
       aes(color = diagnosis, fill = diagnosis),
       position = "identity",

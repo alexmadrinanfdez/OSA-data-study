@@ -17,7 +17,7 @@ df.tot <- df.tot %>% mutate(
   smoker = as.factor(smoker),
   snorer = as.factor(snorer),
   diagnosis = as.factor(diagnosis)
-) %>% select(- patient)
+) %>% dplyr::select(- patient)
 # comparison between gender populations
 df.male <- subset(x = df.tot, subset = gender == "male")
 df.female <- subset(x = df.tot, subset = gender == "female")
@@ -55,9 +55,9 @@ mae.lm.male <- sum(abs(lm.male$residuals)) / length(lm.male$residuals)
 mae.lm.female <- sum(abs(lm.female$residuals)) / length(lm.female$residuals)
 
 cat(
-  " total model >", "R^2:", summary(lm.tot)$r.sq, "MAE:", mae.lm.tot, "\n",
-  "male model >", "R^2:", summary(lm.male)$r.sq, "MAE:", mae.lm.male, "\n",
-  "female model >", "R^2:", summary(lm.female)$r.sq, "MAE:", mae.lm.female, "\n"
+  " total model >", "R2:", summary(lm.tot)$r.sq, "MAE:", mae.lm.tot, "\n",
+  "male model >", "R2:", summary(lm.male)$r.sq, "MAE:", mae.lm.male, "\n",
+  "female model >", "R2:", summary(lm.female)$r.sq, "MAE:", mae.lm.female, "\n"
 )
 
 ## regression curves
@@ -69,10 +69,11 @@ pred.female <- lm(formula = lm.female$fitted.values ~ df.female$AHI)
 xyplot(
   x = lm.tot$fitted.values ~ AHI,
   data = df.tot, groups = gender,
-  ylim = c(-5, 50), auto.key = TRUE
+  ylim = c(-5, 50), auto.key = TRUE,
+  ylab = 'fitted values'
 )
 
-plot(x = df.tot$AHI, y = lm.tot$fitted.values)
+plot(x = df.tot$AHI, y = lm.tot$fitted.values, ylab = 'fitted values', xlab = 'AHI')
 abline(pred.tot, lty = 2, lwd = 2, col = "red")
 
 plot(
