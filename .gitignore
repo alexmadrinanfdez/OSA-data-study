@@ -3,7 +3,6 @@ presentations/
 data/
 # on progress
 R/prediction.R
-R/fun.R
 # report files
 report.*
 biblio.bibtex

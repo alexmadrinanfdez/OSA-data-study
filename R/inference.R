@@ -10,6 +10,8 @@ library(leaps)  # regression subset selection
 library(glmnet) # lasso and elastic-net regularized generalized linear models
 library(pls)    # partial least squares and principal component regression
 
+source(file = 'fun.R')
+
 file <- 'DB.xlsx'
 directory <- '../data'
 
@@ -43,7 +45,7 @@ lm.bmi <- lm(AHI ~ BMI, df.pred)
 
 attach(df.pred)
 op <- par(mfrow =c(2, 4))
-plot(gender, AHI, col = "lightblue")
+plot(gender, AHI, col = "lightblue", xlab = 'gender', ylab = 'AHI')
 points(c(
   coef(lm.gender)[1],
   coef(lm.gender)[1] + coef(lm.gender)[2:length(coef(lm.gender))]), 
@@ -62,7 +64,7 @@ plot(age, AHI, col = "lightblue")
 abline(lm.age, lty = 2, col = "darkblue")
 plot(neck, AHI, col = "lightblue")
 abline(lm.neck, lty = 2, col= "darkblue")
-plot(smoker, AHI, col = "lightblue")
+plot(smoker, AHI, col = "lightblue", xlab = 'smoker', ylab = 'AHI')
 points(c(
   coef(lm.smoker)[1],
   coef(lm.smoker)[1] + coef(lm.smoker)[2:length(coef(lm.smoker))]), 
@@ -73,7 +75,7 @@ lines(c(
   coef(lm.smoker)[1] + coef(lm.smoker)[2:length(coef(lm.smoker))]),
   lty = 2, col = "darkblue"
 )
-plot(snorer, AHI, col = "lightblue")
+plot(snorer, AHI, col = "lightblue", xlab = 'snorer', ylab = 'AHI')
 points(c(
   coef(lm.snorer)[1],
   coef(lm.snorer)[1] + coef(lm.snorer)[2:length(coef(lm.snorer))]), 
@@ -89,17 +91,32 @@ abline(lm.bmi, lty = 2, col= "darkblue")
 par(op)
 detach(df.pred)
 
+# split data into training / testing
+train <- sample(
+  x = c(TRUE, FALSE), size = nrow(df.pred), replace = TRUE, prob = c(.7, .3)
+)
+test <- !train
+# fit models only with training data
+lm.gender.t <- lm(AHI ~ gender, df.pred[train,])
+lm.weight.t <- lm(AHI ~ weight, df.pred[train,])
+lm.height.t <- lm(AHI ~ height, df.pred[train,])
+lm.age.t <- lm(AHI ~ age, df.pred[train,])
+lm.neck.t <- lm(AHI ~ neck, df.pred[train,])
+lm.smoker.t <- lm(AHI ~ smoker, df.pred[train,])
+lm.snorer.t <- lm(AHI ~ snorer, df.pred[train,])
+lm.bmi.t <- lm(AHI ~ BMI, df.pred[train,])
+
 sigma <- sort(
   c(
-    1 / sigma(lm.gender),
-    1 / sigma(lm.weight),
-    1 / sigma(lm.height),
-    1 / sigma(lm.age),
-    1 / sigma(lm.neck),
-    1 / sigma(lm.smoker),
-    1 / sigma(lm.snorer),
-    1 / sigma(lm.bmi)
-  ), index.return = TRUE
+    sigma(lm.gender),
+    sigma(lm.weight),
+    sigma(lm.height),
+    sigma(lm.age),
+    sigma(lm.neck),
+    sigma(lm.smoker),
+    sigma(lm.snorer),
+    sigma(lm.bmi)
+  ), decreasing = TRUE, index.return = TRUE
 )
 r.sq <- sort(
   c(
@@ -125,12 +142,29 @@ f <- sort(
     summary(lm.bmi)$fstatistic[1]
   ), index.return = TRUE
 )
+# use testing data for calculating error
+sigma.t <- c(
+  rse.lm(lm.gender.t, df.pred[test,], df.pred$AHI[test]),
+  rse.lm(lm.weight.t, df.pred[test,], df.pred$AHI[test]),
+  rse.lm(lm.height.t, df.pred[test,], df.pred$AHI[test]),
+  rse.lm(lm.age.t, df.pred[test,], df.pred$AHI[test]),
+  rse.lm(lm.neck.t, df.pred[test,], df.pred$AHI[test]),
+  rse.lm(lm.smoker.t, df.pred[test,], df.pred$AHI[test]),
+  rse.lm(lm.snorer.t, df.pred[test,], df.pred$AHI[test]),
+  rse.lm(lm.bmi.t, df.pred[test,], df.pred$AHI[test])
+)
 
 op <- par(mfrow = c(1, 3))
 plot( # residual standard error (deviation)
-  x = sigma$x, 
-  type = "b", xaxt = "n", ylab = '1 / RSE', xlab = '', 
+  x = sigma$x, ylim = c(15, 25),
+  type = "b", xaxt = "n", ylab = 'RSE', xlab = '', 
   pch = 7, col = 1:8, lty = 2
+)
+points(x = sigma.t[sigma$ix], pch = 7, col = 1:8)
+lines(x = sigma.t[sigma$ix], lty = 2, col = "red")
+legend(
+  x = "topleft", legend = c('training set', 'validation set'),
+  col = c("black", "red"), lty = 2, bty = "n"
 )
 axis(1, at = 1:8, labels = names(df.pred)[1 + sigma$ix])
 plot( # R squared (R^2)
@@ -191,9 +225,28 @@ summary(lm.log)
 
 anova(lm.neck, lm.fit, lm.bckwd, lm.bang, lm.it, lm.nlt) # can't compare lm.log
 anova(lm.fit, lm.it, lm.nlt)
-coef(lm.fit)
-coef(lm.it)
-coef(lm.nlt)
+
+rse <- rep(NA, 3)
+names(rse) <- c('full', 'interaction', 'non-linear')
+rse[1] <- rse.lm(
+  object = lm(AHI ~ ., data = df.pred[train,]), 
+  x = df.pred[test,], 
+  y = df.pred$AHI[test]
+)
+rse[2] <- rse.lm(
+  object = lm(AHI ~ age * neck * BMI - age:neck - age:BMI, data = df.pred[train,]),
+  x = df.pred[test,],
+  y = df.pred$AHI[test]
+)
+rse[3] <- rse.lm(
+  object = lm(AHI ~ neck + I(neck^2), data = df.pred[train,]),
+  x = df.pred[test,],
+  y = df.pred$AHI[test]
+)
+cat('The lowest error model is the', names(rse)[which.min(rse)], 'model\n')
+
+coef(lm.it)[2:length(coef(lm.it))]
+confint(object = lm.it, parm = 2:length(coef(lm.it)))
 
 lm.it.male <- lm(formula = AHI ~ age * neck * BMI, data = df.pred.m)
 lm.it.female <- lm(formula = AHI ~ age * neck * BMI, data = df.pred.f)
@@ -238,19 +291,12 @@ points(
   col = "red", pch = 20
 )
 par(op)
-# show which variables are in each model (same as summary)
-plot(x = regsubsets(x = AHI ~ ., data = df.pred), scale = "Cp")
 
 # bacward & forward stepwise selection
 summary(regsubsets(x = AHI ~ ., data = df.pred, method = "backward"))
 summary(regsubsets(x = AHI ~ ., data = df.pred, method = "forward"))
 
 # subset selection using validation approach
-train <- sample(
-  x = c(TRUE, FALSE), size = nrow(df.pred), replace = TRUE, prob = c(.7, .3)
-)
-test <- !train
-
 regfit <- regsubsets(x = AHI ~ ., data = df.pred[train,], nvmax = length(df.pred) - 1)
 matrix <- model.matrix(object = AHI ~ .,  data = df.pred[test,])
 error <- rep(x = NA, times = length(df.pred) - 1)
@@ -260,14 +306,12 @@ for (i in 1:(length(df.pred) - 1)) {
   error[i] <- mean((df.pred$AHI[test] - pred)^2) # MSE
 }
 
-coef(regsubsets(x = AHI ~ ., data = df.pred), id = which.min(errors)) # full data set
+coef(regsubsets(x = AHI ~ ., data = df.pred), id = which.min(error)) # full data set
 
 # regularization (shrinkage methods)
 # glmnet(x, y, alpha = 1, nlambda = 100, lambda.min.ratio, lambda = NULL, standardize)
 x <- model.matrix(object = AHI ~ ., data = df.pred)[,-1] # exclude intercept
 y <- df.pred$AHI
-train <- sample(x = nrow(df.pred), size = nrow(df.pred)*2/3)
-test <- - train
 # ridge regression (alpha = 0)
 ridge <- glmnet(x = x[train,], y = y[train], alpha = 0, standardize = FALSE)
 mean((predict(object = ridge, s = 50, newx = x[test,]) - y[test])^2)
@@ -288,9 +332,10 @@ pls.fit <- plsr(
 )
 summary(pls.fit)
 validationplot(object = pls.fit, val.type = "RMSEP", legendpos = "topright")
-mean(predict(object = pls.fit, newdata = df.pred[test,], ncomp = 5))
+mean((predict(object = pls.fit, newdata = df.pred[test,], ncomp = 5) - y[test])^2)
 
-mean((mean(y[train]) - y[test])^2)
+mean((mean(y[train]) - y[test])^2) # naive Bayes
+
 # lattice::rfs(model = )
 
 # classification
