@@ -199,8 +199,8 @@ lm.bckwd <- update(object = lm.bckwd, formula. = ~ . - snorer)
 summary(lm.bckwd)
 lm.bckwd <- update(object = lm.bckwd, formula. = ~ . - weight - height)
 summary(lm.bckwd)
-
-lm.bang <- lm(formula = AHI ~ BMI + age + neck + gender, data = df.pred) # BANG predictors
+# BANG predictors
+lm.bang <- lm(formula = AHI ~ BMI + age + neck + gender, data = df.pred) 
 summary(lm.bang)
 
 op <- par(mfrow =c(2, 2))
@@ -334,14 +334,14 @@ summary(pls.fit)
 validationplot(object = pls.fit, val.type = "RMSEP", legendpos = "topright")
 mean((predict(object = pls.fit, newdata = df.pred[test,], ncomp = 5) - y[test])^2)
 
-mean((mean(y[train]) - y[test])^2) # naive Bayes
+mean((mean(y[train]) - y[test])^2) # null linear model
 
 # lattice::rfs(model = )
 
 # classification
 # the task is to predict a target categorical value (diagnosis)
 
-rm(f, r.sq, sigma, list = ls(pattern = 'lm')) # clear working space
+rm(f, r.sq, sigma, sigma.t, list = ls(pattern = 'lm')) # clear some space
 
 file <- 'DB.xlsx'
 directory <- '../data'
@@ -415,7 +415,14 @@ par(op)
 
 # linear discriminant analysis
 lda.fit <- lda(formula = diagnosis ~ ., data = df.class)
-# lda.fit$svd
+lda.fit$svd # ratio of the between- and within-group standard deviations
+lda.fit$svd^2 # their squares are the canonical F-statistics
+
+lda.bang <- lda(
+  formula = diagnosis ~ BMI + age + neck + gender,
+  data = df.class
+)
+lda.bang$svd^2
 
 # quadratic discriminant analysis
 # Uses a QR decomposition which will give an error message 
@@ -428,4 +435,3 @@ qda.fit <- qda(
 # k-nearest neighbors
 # can't be used for inference
 # already gives the result of the prediction
-
