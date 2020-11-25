@@ -9,6 +9,7 @@ library(class)  # functions for classification
 library(leaps)  # regression subset selection
 library(glmnet) # lasso and elastic-net regularized generalized linear models
 library(pls)    # partial least squares and principal component regression
+library(boot)   # bootstrap functions (originally by Angelo Canty for S)
 
 source(file = 'fun.R')
 
@@ -245,6 +246,36 @@ rse[3] <- rse.lm(
 )
 cat('The lowest error model is the', names(rse)[which.min(rse)], 'model\n')
 
+# resampling methods
+glmfit <- glm(AHI ~ ., data = df.pred)
+# validation set
+train <- sample(x = nrow(df), size = nrow(df) * 2/3)
+mean((df.pred$AHI - predict(glmfit, df))[- train]^2) # MSE
+# leave-one-out cross-validation (LOOCV)
+cv.glm(data = df.pred, glmfit = glmfit)$delta[1]
+# k-fold CV
+cv.glm(data = df.pred, glmfit = glmfit, K = 10)$delta[1]
+## bootstrap
+# boot(data, statistic, R)
+
+error.v <- rep(x = 0, times = 10)
+error.cv <- rep(x = 0, times = 10)
+error.loocv <- rep(x = cv.glm(data = df.pred, glmfit = glmfit)$delta[1], times = 10)
+for (i in 1:10) {
+  train <- sample(x = nrow(df), size = nrow(df) * 2/3)
+  error.v[i] <- mean((df.pred$AHI - predict(glmfit, df))[- train]^2)
+  error.cv[i] <- cv.glm(data = df.pred, glmfit = glmfit, K = 10)$delta[1]
+}
+plot(x = error.loocv, ylab = 'MSE', ylim = c(200, 350), type = "l", lty = 2, col = "darkblue")
+lines(x = error.v, lwd = 2, col = "darkred")
+points(x = error.v, pch = 20, col = "darkred")
+lines(x = error.cv, lwd = 2, col = "darkgreen")
+points(x = error.cv, pch = 20, col = "darkgreen")
+legend(
+  x = "topleft", legend = c('LOOCV', 'Validation', 'CV'), bty = "n",
+  col = c("darkblue", "darkred", "darkgreen"), lty = c(2, 1, 1), lwd = c(1, 2, 2)
+)
+
 coef(lm.it)[2:length(coef(lm.it))]
 confint(object = lm.it, parm = 2:length(coef(lm.it)))
 
@@ -364,6 +395,10 @@ glimpse(df.class)
 contrasts(df.class$diagnosis)
 
 # simple logistic regression
+# sigmoid function
+x <- seq(from = -10, to = 10, length.out = 100)
+plot(x = x, y = sigmoid(x), type = "l", lwd = 3, col = "darkblue")
+
 glm.gender <- glm(diagnosis ~ gender, binomial, df.class)
 glm.weight <- glm(diagnosis ~ weight, binomial, df.class)
 glm.height <- glm(diagnosis ~ height, binomial, df.class)
@@ -434,4 +469,4 @@ qda.fit <- qda(
 
 # k-nearest neighbors
 # can't be used for inference
-# already gives the result of the prediction
+# has no parameters

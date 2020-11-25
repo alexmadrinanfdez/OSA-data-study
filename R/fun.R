@@ -1,3 +1,8 @@
+# logistic function
+sigmoid <- function(x) {
+  exp(x) / (1 + exp(x))
+}
+
 # compute RSE from the output of predict.lm()
 rse.lm <- function(object, x, y) {
   fit <- predict.lm(object = object, newdata = x)
