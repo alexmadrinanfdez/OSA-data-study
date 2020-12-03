@@ -1,15 +1,16 @@
 # supervised problem
 
-rm(list = ls()) # clear working space
+rm(list = ls())  # clear working space
 
-library(readxl) # read Excel files
-library(dplyr)  # a grammar of data manipulation
-library(MASS)   # support functions and datasets for Venables and Ripley's MASS
-library(class)  # functions for classification
-library(leaps)  # regression subset selection
-library(glmnet) # lasso and elastic-net regularized generalized linear models
-library(pls)    # partial least squares and principal component regression
-library(boot)   # bootstrap functions (originally by Angelo Canty for S)
+library(readxl)  # read Excel files
+library(dplyr)   # a grammar of data manipulation
+library(MASS)    # support functions and datasets for Venables and Ripley's MASS
+library(class)   # functions for classification
+library(leaps)   # regression subset selection
+library(glmnet)  # lasso and elastic-net regularized generalized linear models
+library(pls)     # partial least squares and principal component regression
+library(boot)    # bootstrap functions (originally by Angelo Canty for S)
+library(ggplot2) # create elegant data visualisations using the Grammar of Graphics 
 
 source(file = 'fun.R')
 
@@ -420,8 +421,7 @@ contrasts(df.class$diagnosis)
 
 # simple logistic regression
 # sigmoid function
-x <- seq(from = -10, to = 10, length.out = 100)
-plot(x = x, y = sigmoid(x), type = "l", lwd = 3, col = "darkblue")
+plot.function(x = sigmoid, from = -10, to = 10, type = "l", lwd = 3, col = "darkblue")
 
 glm.gender <- glm(diagnosis ~ gender, binomial, df.class)
 glm.weight <- glm(diagnosis ~ weight, binomial, df.class)
@@ -499,6 +499,21 @@ table(predicted = lda.pred$class, true = df.class$diagnosis[-train])
 # accuracy
 mean(glm.pred == df.class$diagnosis[-train])
 mean(lda.pred$class == df.class$diagnosis[-train])
+# plotting
+ggplot(data = df.class[-train,], mapping = aes(glm.prob)) +
+  geom_histogram(
+    mapping = aes(color = diagnosis, fill = diagnosis), 
+    position = "identity", bins = 20, alpha = .1
+  ) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800"))
+ggplot(data = df.class[-train,], mapping = aes(lda.pred$posterior[,2])) +
+  geom_histogram(
+    mapping = aes(color = diagnosis, fill = diagnosis), 
+    position = "identity", bins = 20, alpha = .1
+  ) +
+  scale_color_manual(values = c("#00AFBB", "#E7B800")) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800"))
 
 sum(df.class$diagnosis[-train] == "normal")
 sum(df.class$diagnosis[-train] == "severe")
