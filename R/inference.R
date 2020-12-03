@@ -48,7 +48,7 @@ attach(df.pred)
 op <- par(mfrow =c(2, 4))
 plot(gender, AHI, col = "lightblue", xlab = 'gender', ylab = 'AHI')
 points(c(
-  coef(lm.gender)[1],
+  coef(lm.gender)[1], # intercept is different
   coef(lm.gender)[1] + coef(lm.gender)[2:length(coef(lm.gender))]), 
   pch = 4, col = "blue"
 )
@@ -67,7 +67,7 @@ plot(neck, AHI, col = "lightblue")
 abline(lm.neck, lty = 2, col= "darkblue")
 plot(smoker, AHI, col = "lightblue", xlab = 'smoker', ylab = 'AHI')
 points(c(
-  coef(lm.smoker)[1],
+  coef(lm.smoker)[1], # intercept is different
   coef(lm.smoker)[1] + coef(lm.smoker)[2:length(coef(lm.smoker))]), 
   pch = 4, col= "blue"
 )
@@ -78,7 +78,7 @@ lines(c(
 )
 plot(snorer, AHI, col = "lightblue", xlab = 'snorer', ylab = 'AHI')
 points(c(
-  coef(lm.snorer)[1],
+  coef(lm.snorer)[1], # intercept is different
   coef(lm.snorer)[1] + coef(lm.snorer)[2:length(coef(lm.snorer))]), 
   pch = 4, col= "blue"
 )
@@ -92,7 +92,7 @@ abline(lm.bmi, lty = 2, col= "darkblue")
 par(op)
 detach(df.pred)
 
-# split data into training / testing
+# split data into training / validation
 train <- sample(
   x = c(TRUE, FALSE), size = nrow(df.pred), replace = TRUE, prob = c(.7, .3)
 )
@@ -154,6 +154,16 @@ sigma.t <- c(
   rse.lm(lm.snorer.t, df.pred[test,], df.pred$AHI[test]),
   rse.lm(lm.bmi.t, df.pred[test,], df.pred$AHI[test])
 )
+r.sq.t <- c(
+  rsq.lm(lm.gender.t, df.pred[test,], df.pred$AHI[test]),
+  rsq.lm(lm.weight.t, df.pred[test,], df.pred$AHI[test]),
+  rsq.lm(lm.height.t, df.pred[test,], df.pred$AHI[test]),
+  rsq.lm(lm.age.t, df.pred[test,], df.pred$AHI[test]),
+  rsq.lm(lm.neck.t, df.pred[test,], df.pred$AHI[test]),
+  rsq.lm(lm.smoker.t, df.pred[test,], df.pred$AHI[test]),
+  rsq.lm(lm.snorer.t, df.pred[test,], df.pred$AHI[test]),
+  rsq.lm(lm.bmi.t, df.pred[test,], df.pred$AHI[test])
+)
 
 op <- par(mfrow = c(1, 3))
 plot( # residual standard error (deviation)
@@ -172,6 +182,12 @@ plot( # R squared (R^2)
   x = r.sq$x, 
   type = "b", xaxt = "n", ylab = 'R-squared', xlab = '', 
   pch = 7, col = 1:8, lty = 2
+)
+points(x = r.sq.t[sigma$ix], pch = 7, col = 1:8)
+lines(x = r.sq.t[sigma$ix], lty = 2, col = "red")
+legend(
+  x = "topleft", legend = c('training set', 'validation set'),
+  col = c("black", "red"), lty = 2, bty = "n"
 )
 axis(1, at = 1:8, labels = names(df.pred)[1 + r.sq$ix])
 plot( # F statistic
@@ -246,36 +262,6 @@ rse[3] <- rse.lm(
 )
 cat('The lowest error model is the', names(rse)[which.min(rse)], 'model\n')
 
-# resampling methods
-glmfit <- glm(AHI ~ ., data = df.pred)
-# validation set
-train <- sample(x = nrow(df), size = nrow(df) * 2/3)
-mean((df.pred$AHI - predict(glmfit, df))[- train]^2) # MSE
-# leave-one-out cross-validation (LOOCV)
-cv.glm(data = df.pred, glmfit = glmfit)$delta[1]
-# k-fold CV
-cv.glm(data = df.pred, glmfit = glmfit, K = 10)$delta[1]
-## bootstrap
-# boot(data, statistic, R)
-
-error.v <- rep(x = 0, times = 10)
-error.cv <- rep(x = 0, times = 10)
-error.loocv <- rep(x = cv.glm(data = df.pred, glmfit = glmfit)$delta[1], times = 10)
-for (i in 1:10) {
-  train <- sample(x = nrow(df), size = nrow(df) * 2/3)
-  error.v[i] <- mean((df.pred$AHI - predict(glmfit, df))[- train]^2)
-  error.cv[i] <- cv.glm(data = df.pred, glmfit = glmfit, K = 10)$delta[1]
-}
-plot(x = error.loocv, ylab = 'MSE', ylim = c(200, 350), type = "l", lty = 2, col = "darkblue")
-lines(x = error.v, lwd = 2, col = "darkred")
-points(x = error.v, pch = 20, col = "darkred")
-lines(x = error.cv, lwd = 2, col = "darkgreen")
-points(x = error.cv, pch = 20, col = "darkgreen")
-legend(
-  x = "topleft", legend = c('LOOCV', 'Validation', 'CV'), bty = "n",
-  col = c("darkblue", "darkred", "darkgreen"), lty = c(2, 1, 1), lwd = c(1, 2, 2)
-)
-
 coef(lm.it)[2:length(coef(lm.it))]
 confint(object = lm.it, parm = 2:length(coef(lm.it)))
 
@@ -291,6 +277,39 @@ anova(lm.it.male, lm.nlt.male)
 summary(lm.it.female)
 summary(lm.nlt.female)
 anova(lm.it.female, lm.nlt.female)
+
+# resampling methods
+glmfit <- glm(AHI ~ ., data = df.pred)
+# validation set
+train <- sample(x = nrow(df), size = nrow(df) * 2/3)
+mean((df.pred$AHI - predict(glmfit, df))[- train]^2) # MSE
+# leave-one-out cross-validation (LOOCV)
+cv.glm(data = df.pred, glmfit = glmfit)$delta[1]
+# k-fold CV
+cv.glm(data = df.pred, glmfit = glmfit, K = 10)$delta[1]
+# bootstrap
+# boot(data, statistic, R)
+
+error.v <- rep(x = 0, times = 10)
+error.cv <- rep(x = 0, times = 10)
+error.loocv <- rep(x = cv.glm(data = df.pred, glmfit = glmfit)$delta[1], times = 10)
+for (i in 1:10) {
+  train <- sample(x = nrow(df), size = nrow(df) * 2/3)
+  error.v[i] <- mean((df.pred$AHI - predict(glmfit, df))[- train]^2)
+  error.cv[i] <- cv.glm(data = df.pred, glmfit = glmfit, K = 10)$delta[1]
+}
+plot(
+  x = error.loocv, ylab = 'MSE', ylim = c(200, 350), 
+  type = "o", lty = 2, pch = 20, col = "darkblue"
+)
+lines(x = error.v, lty = 2, col = "darkred")
+points(x = error.v, pch = 20, col = "darkred")
+lines(x = error.cv, lty = 2, col = "darkgreen")
+points(x = error.cv, pch = 20, col = "darkgreen")
+legend(
+  x = "topleft", legend = c('LOOCV', 'Validation', 'CV'), bty = "n",
+  col = c("darkblue", "darkred", "darkgreen"), lty = 2
+)
 
 # subset selection
 # best subset selection
@@ -323,6 +342,7 @@ points(
 )
 par(op)
 
+coef(regsubsets(x = AHI ~ ., data = df.pred), which.min(reg.sum$bic))[-1]
 # bacward & forward stepwise selection
 summary(regsubsets(x = AHI ~ ., data = df.pred, method = "backward"))
 summary(regsubsets(x = AHI ~ ., data = df.pred, method = "forward"))
@@ -346,7 +366,6 @@ y <- df.pred$AHI
 # ridge regression (alpha = 0)
 ridge <- glmnet(x = x[train,], y = y[train], alpha = 0, standardize = FALSE)
 mean((predict(object = ridge, s = 50, newx = x[test,]) - y[test])^2)
-
 # the lasso (alpha = 1)
 lasso <- glmnet(x = x[train,], y = y[train], alpha = 1, standardize = FALSE)
 mean((predict(object = lasso, s = 50, newx = x[test,]) - y[test])^2)
@@ -356,15 +375,23 @@ plot(ridge)
 plot(lasso)
 par(op)
 
-# Partial least squares (dimension reduction)
-# plsr(formula, subset, scale = FALSE, validation = c("none", "CV", "LOO"))
-pls.fit <- plsr(
-  formula = AHI ~ ., data = df.pred, subset = train, scale = FALSE, validation = "CV"
-)
-summary(pls.fit)
-validationplot(object = pls.fit, val.type = "RMSEP", legendpos = "topright")
-mean((predict(object = pls.fit, newdata = df.pred[test,], ncomp = 5) - y[test])^2)
+coef(object = lasso, s = 0) # linear regression
+coef(object = lasso, s = .1)
+coef(object = lasso, s = 1)
+coef(object = lasso, s = 10)
 
+# partial least squares (dimension reduction)
+# plsr(formula, subset, scale = FALSE, validation = c("none", "CV", "LOO"))
+pls.none <- plsr(
+  formula = AHI ~ ., data = df.pred, subset = train, scale = TRUE, validation = "none"
+)
+pls.loo <- plsr(
+  formula = AHI ~ ., data = df.pred, subset = train, scale = TRUE, validation = "LOO"
+)
+summary(pls.loo)
+validationplot(object = pls.none, val.type = "RMSEP", legendpos = "topright")
+validationplot(object = pls.loo, val.type = "RMSEP", legendpos = "topright")
+mean((predict(object = pls.loo, newdata = df.pred[test,], ncomp = 3) - y[test])^2)
 mean((mean(y[train]) - y[test])^2) # null linear model
 
 # lattice::rfs(model = )
@@ -372,10 +399,7 @@ mean((mean(y[train]) - y[test])^2) # null linear model
 # classification
 # the task is to predict a target categorical value (diagnosis)
 
-rm(f, r.sq, sigma, sigma.t, list = ls(pattern = 'lm')) # clear some space
-
-file <- 'DB.xlsx'
-directory <- '../data'
+rm(f, r.sq, r.sq.t, sigma, sigma.t, list = ls(pattern = 'lm')) # clear some space
 
 df.class <- df %>% 
   mutate(
@@ -443,14 +467,11 @@ glm.bckwd <- update(object = glm.bckwd, formula. = ~ . - neck)
 summary(glm.bckwd)
 glm.bckwd <- update(object = glm.bckwd, formula. =  ~ . - height - weight)
 summary(glm.bckwd)
-
-op <- par(mfrow =c(2, 2))
-plot(glm.bckwd)
-par(op)
+coef(glm.bckwd)[-1]
 
 # linear discriminant analysis
 lda.fit <- lda(formula = diagnosis ~ ., data = df.class)
-lda.fit$svd # ratio of the between- and within-group standard deviations
+lda.fit$svd   # ratio of the between- and within-group standard deviations
 lda.fit$svd^2 # their squares are the canonical F-statistics
 
 lda.bang <- lda(
@@ -459,13 +480,33 @@ lda.bang <- lda(
 )
 lda.bang$svd^2
 
+train <- sample(x = nrow(df.class), size = nrow(df.class) * 4/5)
+
+glm.fit <- glm(
+  formula = diagnosis ~ gender + age + BMI, 
+  family = binomial, data = df.class, subset = train
+)
+lda.fit <- lda(formula = diagnosis ~ gender + age + BMI, data = df.class, subset = train)
+
+glm.prob <- predict(object = glm.fit, type = "response", newdata = df.class[-train,])
+glm.pred <- rep_len(x = levels(df.class$diagnosis)[1], length.out = nrow(df.class[-train,]))
+glm.pred[glm.prob > .5] <- levels(df.class$diagnosis)[2] # decision threshold
+lda.pred <- predict(object = lda.fit, newdata = df.class[-train,])
+# sum(lda.pred$posterior[,2] > .9) # decision threshold
+# confusion matrix
+table(predicted = glm.pred, true = df.class$diagnosis[-train])
+table(predicted = lda.pred$class, true = df.class$diagnosis[-train])
+# accuracy
+mean(glm.pred == df.class$diagnosis[-train])
+mean(lda.pred$class == df.class$diagnosis[-train])
+
+sum(df.class$diagnosis[-train] == "normal")
+sum(df.class$diagnosis[-train] == "severe")
+
 # quadratic discriminant analysis
 # Uses a QR decomposition which will give an error message 
 # if the within-group variance is singular for any group
-qda.fit <- qda(
-  formula = diagnosis ~ weight + height + age + neck + BMI ,
-  data = df.class.m
-)
+qda.fit <- qda(formula = diagnosis ~ weight + height + age + neck + BMI ,data = df.class.m)
 
 # k-nearest neighbors
 # can't be used for inference

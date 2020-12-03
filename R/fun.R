@@ -9,6 +9,14 @@ rse.lm <- function(object, x, y) {
   sqrt(sum((y - fit)^2)/(length(y) - 2))
 }
 
+# compute R-squared from the output of predict.lm()
+rsq.lm <- function(object, x, y) {
+  fit <- predict.lm(object = object, newdata = x)
+  rss <- sum((y - fit)^2)
+  tss <- sum((y - mean(y))^2)
+  1 - rss/tss
+}
+
 # # predict() for objects of class "regsubsets"
 # predict.regsubsets <- function(object, newdata, id) {
 #   # extract the formula
