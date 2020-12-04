@@ -1,8 +1,6 @@
 # directories
 presentations/
 data/
-# on progress
-R/prediction.R
 # report files
 report.*
 biblio.bibtex

@@ -17,13 +17,13 @@ rsq.lm <- function(object, x, y) {
   1 - rss/tss
 }
 
-# # predict() for objects of class "regsubsets"
-# predict.regsubsets <- function(object, newdata, id) {
-#   # extract the formula
-#   formula <- as.formula(object = object$call[[2]])
-#   # apply the different coefficients of each subset to a matrix of values
-#   matrix <- model.matrix(object = formula, data = newdata)
-#   ci <- coef(object = object, id = id)
-#   xvars <- names(ci)
-#   matrix[,xvars] %*% ci
-# }
+# predict() for objects of class "regsubsets"
+predict.regsubsets <- function(object, newdata, id) {
+  # extract the formula
+  formula <- as.formula(object = object$call[[2]])
+  # apply the different coefficients of each subset to a matrix of values
+  matrix <- model.matrix(object = formula, data = newdata)
+  ci <- coef(object = object, id = id)
+  xvars <- names(ci)
+  matrix[,xvars] %*% ci
+}

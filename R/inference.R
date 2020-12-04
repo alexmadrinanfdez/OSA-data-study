@@ -468,6 +468,7 @@ summary(glm.bckwd)
 glm.bckwd <- update(object = glm.bckwd, formula. =  ~ . - height - weight)
 summary(glm.bckwd)
 coef(glm.bckwd)[-1]
+exp(coef(glm.bckwd))[-1] # transform the coeficients from log-odds to odds.
 
 # linear discriminant analysis
 lda.fit <- lda(formula = diagnosis ~ ., data = df.class)
