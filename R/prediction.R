@@ -133,7 +133,7 @@ plot(rmse, mae)
 # classification
 train.class <- subset(x = train, select = c(diagnosis, gender, age, neck, BMI))
 # binary classifier
-df.twoclass <- df %>% 
+train.twoclass <- df %>% 
   mutate(
     diagnosis = as.character(diagnosis) # reset no. levels
   ) %>% 
@@ -142,13 +142,9 @@ df.twoclass <- df %>%
   mutate(diagnosis = as.factor(diagnosis))
 
 # CARET setup
-index <- createDataPartition(
-  y = df.twoclass$diagnosis, # the outcome data are needed
-  p = .75, # percentage of data in the training set
-  list = FALSE # should the results be in a list (TRUE) or a matrix (FALSE)
-)
-train.twoclass <- df.twoclass[index,]
-test.twoclass  <- df.twoclass[-index,]
+# index <- createDataPartition(y = df.twoclass$diagnosis, p = .75, list = FALSE)
+# train.twoclass <- df.twoclass[index,]
+# test.twoclass  <- df.twoclass[-index,]
 
 ctrl <- trainControl(
   method = "cv",
@@ -159,51 +155,39 @@ ctrl <- trainControl(
 set.seed(1)
 # logical regression
 glm.fit <- train(
-  form = diagnosis ~ .,
-  data = train.twoclass,
-  method = 'glm',
-  family = "binomial",
-  metric = "ROC",
-  trControl = ctrl
+  form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
+  method = 'glm', family = "binomial",
+  metric = "ROC", trControl = ctrl
 )
 set.seed(2)
 # LDA
 lda.fit <- train(
-  form = diagnosis ~ .,
-  data = train.twoclass,
+  form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
   method = 'lda',
-  metric = "ROC",
-  trControl = ctrl
+  metric = "ROC", trControl = ctrl
 )
 set.seed(3)
 # QDA
 qda.fit <- train(
-  form = diagnosis ~ .,
-  data = train.twoclass,
+  form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
   method = 'qda',
-  metric = "ROC",
-  trControl = ctrl
+  metric = "ROC", trControl = ctrl
 )
 set.seed(4)
 # QDA + stepwise feature selection
-qdastep.fit <- train(
-  form = diagnosis ~ .,
-  data = train.twoclass,
+sqda.fit <- train(
+  form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
   method = 'stepQDA',
   # Tuning parameters: maxvar (Maximum #Variables), direction (Search Direction)
-  metric = "ROC",
-  trControl = ctrl
+  metric = "ROC", trControl = ctrl
 )
 set.seed(5)
 # KNN
 knn.fit <- train(
-  form = diagnosis ~ .,
-  data = train.twoclass,
+  form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
   method = 'knn', # tuning parameters: k (#Neighbors)
   # preProcess = c("center", "scale"),
-  metric = "ROC",
-  tuneLength = 20,
-  trControl = ctrl
+  metric = "ROC", tuneLength = 20, trControl = ctrl
 )
 trellis.par.set(name = caretTheme())
 plot(knn.fit, col = "darkblue")
@@ -218,35 +202,49 @@ rs <- resamples(x = list(
   logreg = glm.fit,
   lda = lda.fit,
   qda = qda.fit,
-  stepqda = qdastep.fit,
+  stepqda = sqda.fit,
   knn = knn.fit
 ))
 summary(rs)
 
 # test set
 # predict(object, newdata, type = "prob")
-glm.pred <- predict(glm.fit, newdata = test.twoclass)
-lda.pred <- predict(lda.fit, newdata = test.twoclass)
-qda.pred <- predict(qda.fit, newdata = test.twoclass)
-sqda.pred <- predict(qdastep.fit, newdata = test.twoclass)
-knn.pred <- predict(knn.fit, newdata = test.twoclass)
+# glm.pred <- predict(glm.fit, newdata = test.twoclass)
+# lda.pred <- predict(lda.fit, newdata = test.twoclass)
+# qda.pred <- predict(qda.fit, newdata = test.twoclass)
+# sqda.pred <- predict(sqda.fit, newdata = test.twoclass)
+# knn.pred <- predict(knn.fit, newdata = test.twoclass)
 # confusion matrices
 # confusionMatrix(data, reference)$byClass[n] # accuracy metrics
-glm.cf <- confusionMatrix(data = glm.pred, reference = test.twoclass$diagnosis)
-lda.cf <- confusionMatrix(data = lda.pred, reference = test.twoclass$diagnosis)
-qda.cf <- confusionMatrix(data = qda.pred, reference = test.twoclass$diagnosis)
-sqda.cf <- confusionMatrix(data = sqda.pred, reference = test.twoclass$diagnosis)
-knn.cf <- confusionMatrix(data = knn.pred, reference = test.twoclass$diagnosis)
+# glm.cf <- confusionMatrix(data = glm.pred, reference = test.twoclass$diagnosis)
+# lda.cf <- confusionMatrix(data = lda.pred, reference = test.twoclass$diagnosis)
+# qda.cf <- confusionMatrix(data = qda.pred, reference = test.twoclass$diagnosis)
+# sqda.cf <- confusionMatrix(data = sqda.pred, reference = test.twoclass$diagnosis)
+# knn.cf <- confusionMatrix(data = knn.pred, reference = test.twoclass$diagnosis)
 
 # sensitivity is the percentage of true defaulters that are identified
+# sens <- c(
+#   glm.cf$byClass[1], lda.cf$byClass[1], qda.cf$byClass[1], 
+#   sqda.cf$byClass[1], knn.cf$byClass[1]
+# )
 sens <- c(
-  glm.cf$byClass[1], lda.cf$byClass[1], qda.cf$byClass[1], 
-  sqda.cf$byClass[1], knn.cf$byClass[1]
+  glm.fit[["results"]]$Sens,
+  lda.fit[["results"]]$Sens,
+  qda.fit[["results"]]$Sens,
+  sqda.fit[["results"]]$Sens,
+  knn.fit[["results"]]$Sens[which.max(knn.fit[["results"]]$ROC)]
 )
 # specificity is the percentage of non-defaulters that are correctly identified
+# spec <- c(
+#   glm.cf$byClass[2], lda.cf$byClass[2], qda.cf$byClass[2], 
+#   sqda.cf$byClass[2], knn.cf$byClass[2]
+# )
 spec <- c(
-  glm.cf$byClass[2], lda.cf$byClass[2], qda.cf$byClass[2], 
-  sqda.cf$byClass[2], knn.cf$byClass[2]
+  glm.fit[["results"]]$Spec,
+  lda.fit[["results"]]$Spec,
+  qda.fit[["results"]]$Spec,
+  sqda.fit[["results"]]$Spec,
+  knn.fit[["results"]]$Spec[which.max(knn.fit[["results"]]$ROC)]
 )
 
 plot(x = sens,y = spec)
