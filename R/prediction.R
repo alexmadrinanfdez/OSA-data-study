@@ -13,6 +13,7 @@ library(boot)    # bootstrap functions (originally by Angelo Canty for S)
 library(pls)     # partial least squares and principal component regression
 library(caret)   # classification and regression training
 library(klaR)    # classification and visualization
+library(gam)     # generalized additive models
 
 source(file = 'fun.R')
 
@@ -42,25 +43,25 @@ test <- split[[1]]
 train <- split[[2]]
 
 # regression
-train.pred <- subset(x = train, select = c(AHI, gender, age, neck, BMI))
-# train.pred.m <- subset(x = train.pred, subset = gender == "male")
-# train.pred.f <- subset(x = train.pred, subset = gender == "female")
+train.reg <- subset(x = train, select = c(AHI, gender, age, neck, BMI))
+# train.reg.m <- subset(x = train.reg, subset = gender == "male")
+# train.reg.f <- subset(x = train.reg, subset = gender == "female")
 
 # subset selection + cross validation
 k <- 10
-folds <- sample(x = 1:k, size = nrow(train.pred), rep = T) # divide data set in k folds
+folds <- sample(x = 1:k, size = nrow(train.reg), rep = T) # divide data set in k folds
 cv.error <- matrix( # MSE
-  nrow = k, ncol = (length(train.pred) - 1)^2,
-  dimnames = list(NULL, paste(1:(length(train.pred) - 1)^2))
+  nrow = k, ncol = (length(train.reg) - 1)^2,
+  dimnames = list(NULL, paste(1:(length(train.reg) - 1)^2))
 )
 for (i in 1:k) {
   fit <- regsubsets(
-    x = AHI ~ age * neck * BMI * gender, data = train.pred[folds != i,], 
-    nvmax = (length(train.pred) - 1)^2
+    x = AHI ~ age * neck * BMI * gender, data = train.reg[folds != i,], 
+    nvmax = (length(train.reg) - 1)^2
   )
-  for (j in 1:((length(train.pred) - 1)^2 - 1)) {
-    pred <- predict(object = fit, newdata = train.pred[folds == i,], id = j)
-    cv.error[i, j] <- mean((train.pred$AHI[folds == i] - pred)^2)
+  for (j in 1:((length(train.reg) - 1)^2 - 1)) {
+    pred <- predict(object = fit, newdata = train.reg[folds == i,], id = j)
+    cv.error[i, j] <- mean((train.reg$AHI[folds == i] - pred)^2)
   }
 }
 cv.error <- apply(X = cv.error, MARGIN = 2, FUN = mean) # to columns
@@ -70,14 +71,14 @@ points(
   col = "red", pch = 20
 )
 coef(regsubsets(
-  x = AHI ~ age * neck * BMI * gender, data = train.pred), id = which.min(cv.error)
+  x = AHI ~ age * neck * BMI * gender, data = train.reg), id = which.min(cv.error)
 )
-lm.fit <- lm(AHI ~ neck + BMI + age:neck + neck:BMI + age:gender, data = train.pred)
+lm.fit <- lm(AHI ~ neck + BMI + age:neck + neck:BMI + age:gender, data = train.reg)
 lm.fit$coefficients
 
 # shrinkage methods
-x <- model.matrix(object = AHI ~ age * neck * BMI * gender, data = train.pred)[,-1]
-y <- train.pred$AHI
+x <- model.matrix(object = AHI ~ age * neck * BMI * gender, data = train.reg)[,-1]
+y <- train.reg$AHI
 # cv.glmnet(x, y, alpha = 1, nfolds = 10)
 # ridge regression
 ridge <- glmnet(x = x, y = y, alpha = 0, standardize = FALSE)
@@ -97,11 +98,99 @@ predict(object = ridge, s = lambda.ridge, type = "coefficients")
 predict(object = lasso, s = lambda.lasso, type = "coefficients")
 
 # partial least squares (dimension reduction)
-pls.fit <- plsr(AHI ~ age * neck * BMI * gender, data = train.pred, validation = "CV")
+pls.fit <- plsr(AHI ~ age * neck * BMI * gender, data = train.reg, validation = "CV")
 summary(pls.fit)
 validationplot(object = pls.fit, val.type = "RMSEP", legendpos = "topright")
-mean((predict(object = pls.fit, newdata = train.pred, ncomp = 3) - y)^2)
-MSEP(object = pls.fit, estimate = c("train", "CV"), ncomp = 3)
+mean((predict(object = pls.fit, newdata = train.reg, ncomp = 2) - y)^2)
+MSEP(object = pls.fit, estimate = c("train", "CV"), ncomp = 2)
+
+# polynomial regression
+set.seed(2) # cv.glm() updates the value of .Random.seed
+d <- 5
+cv.error <- rep(x = 0, times = d)
+for (i in 1:d) {
+  pol.fit <- glm(
+    AHI ~ 
+      poly(age, degree = d) + poly(neck, degree = d) + poly(BMI, degree = d) +
+      neck:BMI:gender,
+    data = train.reg
+  )
+  cv.error[i] = cv.glm(data = train.reg, glmfit = pol.fit, K = k)$delta[1]
+}
+plot(x = cv.error, type = "b", xlab = 'degree of the polynomial', ylab = 'MSE')
+points(
+  x = which.min(cv.error), y = min(cv.error),
+  col = "red", pch = 20
+)
+
+# regression splines
+set.seed(3)
+df <- 10
+cv.error <- rep(x = 0, times = df)
+for (i in 1:df) {
+  ns.fit <- glm(
+    AHI ~ ns(age, df = i) + ns(neck, df = i) + ns(BMI, df = i) + neck:BMI:gender,
+    data = train.reg
+  )
+  cv.error[i] = cv.glm(data = train.reg, glmfit = ns.fit, K = k)$delta[1]
+}
+plot(x = cv.error, type = "b", xlab = 'degrees of freedom', ylab = 'MSE')
+points(
+  x = which.min(cv.error), y = min(cv.error),
+  col = "red", pch = 20
+)
+df <- which.min(cv.error)
+ns.fit <- glm(
+  AHI ~ ns(age, df = df) + ns(neck, df = df) + ns(BMI, df = df) + neck:BMI:gender,
+  data = train.reg
+)
+
+# smoothing splines
+set.seed(4)
+df <- 10
+cv.error <- rep(x = 0, times = df)
+for (i in 1:df) {
+  ss.fit <- gam(
+    AHI ~ s(age, df = i) + s(neck, df = i) + s(BMI, df = i) + neck:BMI:gender,
+    data = train.reg
+  )
+  cv.error[i] = cv.glm(data = train.reg, glmfit = ss.fit, K = k)$delta[1]
+}
+plot(x = cv.error, type = "b", xlab = 'degrees of freedom', ylab = 'MSE')
+points(
+  x = which.min(cv.error), y = min(cv.error),
+  col = "red", pch = 20
+)
+df <- which.min(cv.error)
+ss.fit <- gam(
+  AHI ~ s(age, df = df) + s(neck, df = df) + s(BMI, df = df) + neck:BMI:gender,
+  data = train.reg
+)
+
+# local regression
+set.seed(5)
+s <- 10
+cv.error <- rep(x = 0, times = s - 1)
+for (i in 2:s) {
+  lo.fit <- gam(
+    AHI ~ lo(age, neck, BMI, span = i/10) + neck:BMI:gender, data = train.reg
+  )
+  cv.error[i-1] = cv.glm(data = train.reg, glmfit = lo.fit, K = k)$delta[1]
+}
+plot(x = 2:s/10, y = cv.error, type = "b", xlab = 'span', ylab = 'MSE')
+points(
+  x = (which.min(cv.error) + 1)/10, y = min(cv.error),
+  col = "red", pch = 20
+)
+s <- (which.min(cv.error) + 1)/10
+lo.fit <- gam(
+  AHI ~ lo(age, neck, BMI, span = s) + neck:BMI:gender, data = train.reg
+)
+
+# GAM
+gam.fit <- gam(
+  AHI ~ lo(age, BMI, span = .7) + s(neck) + neck:BMI:gender, data = train.reg
+)
 
 # test set
 xt <- model.matrix(object = AHI ~ age * neck * BMI * gender, data = test)[,-1] # glmnet
@@ -111,7 +200,12 @@ rmse <- c(
   sqrt(mean((predict(lm.fit, test) - test$AHI)^2)),
   sqrt(mean((predict(ridge, lambda.ridge, newx = xt) - test$AHI)^2)),
   sqrt(mean((predict(lasso, lambda.lasso, newx = xt) - test$AHI)^2)),
-  RMSEP(pls.fit, "test", test, 3)$val[2]
+  RMSEP(pls.fit, "test", test, 2)$val[2],
+  sqrt(mean((predict(pol.fit, test) - test$AHI)^2)),
+  sqrt(mean((predict(ns.fit, test) - test$AHI)^2)),
+  sqrt(mean((predict(ss.fit, test) - test$AHI)^2)),
+  sqrt(mean((predict(lo.fit, test) - test$AHI)^2)),
+  sqrt(mean((predict(gam.fit, test) - test$AHI)^2))
 )
 
 mae <- c(
@@ -119,7 +213,13 @@ mae <- c(
   mean(abs(predict(lm.fit, test) - test$AHI)),
   mean(abs(predict(ridge, lambda.ridge, newx = xt) - test$AHI)),
   mean(abs(predict(lasso, lambda.lasso, newx = xt) - test$AHI)),
-  mean(abs(predict(pls.fit, test, 3) - test$AHI))
+  mean(abs(predict(pls.fit, test, 2) - test$AHI)),
+  mean(abs(predict(pol.fit, test) - test$AHI)),
+  mean(abs(predict(ns.fit, test) - test$AHI)),
+  mean(abs(predict(ss.fit, test) - test$AHI)),
+  mean(abs(predict(lo.fit, test) - test$AHI)),
+  mean(abs(predict(gam.fit, test) - test$AHI))
+  
 )
 
 plot(rmse, mae)
@@ -178,14 +278,14 @@ set.seed(4)
 sqda.fit <- train(
   form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
   method = 'stepQDA',
-  # Tuning parameters: maxvar (Maximum #Variables), direction (Search Direction)
+  # tuning parameters: maxvar (maximum #variables), direction (search direction)
   metric = "ROC", trControl = ctrl
 )
 set.seed(5)
 # KNN
 knn.fit <- train(
   form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
-  method = 'knn', # tuning parameters: k (#Neighbors)
+  method = 'knn', # tuning parameter: k (#neighbors)
   # preProcess = c("center", "scale"),
   metric = "ROC", tuneLength = 20, trControl = ctrl
 )
