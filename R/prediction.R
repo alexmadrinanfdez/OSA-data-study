@@ -106,28 +106,33 @@ MSEP(object = pls.fit, estimate = c("train", "CV"), ncomp = 2)
 
 # polynomial regression
 set.seed(2) # cv.glm() updates the value of .Random.seed
-d <- 5
-cv.error <- rep(x = 0, times = d)
-for (i in 1:d) {
+n <- 6
+cv.error <- rep(x = 0, times = n - 1)
+for (i in 2:n) {
   pol.fit <- glm(
     AHI ~ 
-      poly(age, degree = d) + poly(neck, degree = d) + poly(BMI, degree = d) +
+      poly(age, degree = i) + poly(neck, degree = i) + poly(BMI, degree = i) +
       neck:BMI:gender,
     data = train.reg
   )
-  cv.error[i] = cv.glm(data = train.reg, glmfit = pol.fit, K = k)$delta[1]
+  cv.error[i-1] = cv.glm(data = train.reg, glmfit = pol.fit, K = k)$delta[1]
 }
-plot(x = cv.error, type = "b", xlab = 'degree of the polynomial', ylab = 'MSE')
-points(
-  x = which.min(cv.error), y = min(cv.error),
-  col = "red", pch = 20
+plot(
+  x = 2:n, y = cv.error, type = "b", xlab = 'order of the polynomial', ylab = 'MSE'
+)
+points(x = which.min(cv.error) + 1, y = min(cv.error), col = "red", pch = 20)
+pol.fit <- glm(
+  AHI ~ 
+    poly(age, degree = 2) + poly(neck, degree = 2) + poly(BMI, degree = 2) +
+    neck:BMI:gender,
+  data = train.reg
 )
 
 # regression splines
 set.seed(3)
-df <- 10
-cv.error <- rep(x = 0, times = df)
-for (i in 1:df) {
+n <- 10
+cv.error <- rep(x = 0, times = n)
+for (i in 1:n) {
   ns.fit <- glm(
     AHI ~ ns(age, df = i) + ns(neck, df = i) + ns(BMI, df = i) + neck:BMI:gender,
     data = train.reg
@@ -135,21 +140,17 @@ for (i in 1:df) {
   cv.error[i] = cv.glm(data = train.reg, glmfit = ns.fit, K = k)$delta[1]
 }
 plot(x = cv.error, type = "b", xlab = 'degrees of freedom', ylab = 'MSE')
-points(
-  x = which.min(cv.error), y = min(cv.error),
-  col = "red", pch = 20
-)
-df <- which.min(cv.error)
+points(x = which.min(cv.error), y = min(cv.error), col = "red", pch = 20)
 ns.fit <- glm(
-  AHI ~ ns(age, df = df) + ns(neck, df = df) + ns(BMI, df = df) + neck:BMI:gender,
+  AHI ~ ns(age, df = 1) + ns(neck, df = 1) + ns(BMI, df = 1) + neck:BMI:gender,
   data = train.reg
 )
 
 # smoothing splines
 set.seed(4)
-df <- 10
-cv.error <- rep(x = 0, times = df)
-for (i in 1:df) {
+n <- 10
+cv.error <- rep(x = 0, times = n)
+for (i in 1:n) {
   ss.fit <- gam(
     AHI ~ s(age, df = i) + s(neck, df = i) + s(BMI, df = i) + neck:BMI:gender,
     data = train.reg
@@ -157,40 +158,35 @@ for (i in 1:df) {
   cv.error[i] = cv.glm(data = train.reg, glmfit = ss.fit, K = k)$delta[1]
 }
 plot(x = cv.error, type = "b", xlab = 'degrees of freedom', ylab = 'MSE')
-points(
-  x = which.min(cv.error), y = min(cv.error),
-  col = "red", pch = 20
-)
-df <- which.min(cv.error)
+points(x = which.min(cv.error), y = min(cv.error), col = "red", pch = 20)
 ss.fit <- gam(
-  AHI ~ s(age, df = df) + s(neck, df = df) + s(BMI, df = df) + neck:BMI:gender,
+  AHI ~ s(age, df = 2) + s(neck, df = 2) + s(BMI, df = 2) + neck:BMI:gender,
   data = train.reg
 )
 
 # local regression
 set.seed(5)
-s <- 10
-cv.error <- rep(x = 0, times = s - 1)
-for (i in 2:s) {
+n <- 10
+cv.error <- rep(x = 0, times = n - 1)
+for (i in 2:n) {
   lo.fit <- gam(
     AHI ~ lo(age, neck, BMI, span = i/10) + neck:BMI:gender, data = train.reg
   )
   cv.error[i-1] = cv.glm(data = train.reg, glmfit = lo.fit, K = k)$delta[1]
 }
-plot(x = 2:s/10, y = cv.error, type = "b", xlab = 'span', ylab = 'MSE')
+plot(x = 2:n/10, y = cv.error, type = "b", xlab = 'span', ylab = 'MSE')
 points(
   x = (which.min(cv.error) + 1)/10, y = min(cv.error),
   col = "red", pch = 20
 )
-s <- (which.min(cv.error) + 1)/10
 lo.fit <- gam(
-  AHI ~ lo(age, neck, BMI, span = s) + neck:BMI:gender, data = train.reg
+  AHI ~ lo(age, neck, BMI, span = .7) + neck:BMI:gender, data = train.reg
 )
 
 # GAM
-gam.fit <- gam(
-  AHI ~ lo(age, BMI, span = .7) + s(neck) + neck:BMI:gender, data = train.reg
-)
+gam.fit <- gam(AHI ~ lo(age, BMI) + s(neck) + neck:BMI:gender, data = train.reg)
+# library(akima) to plot two-dimensional surface
+# plot(gam.fit)
 
 # test set
 xt <- model.matrix(object = AHI ~ age * neck * BMI * gender, data = test)[,-1] # glmnet
@@ -204,10 +200,9 @@ rmse <- c(
   sqrt(mean((predict(pol.fit, test) - test$AHI)^2)),
   sqrt(mean((predict(ns.fit, test) - test$AHI)^2)),
   sqrt(mean((predict(ss.fit, test) - test$AHI)^2)),
-  sqrt(mean((predict(lo.fit, test) - test$AHI)^2)),
-  sqrt(mean((predict(gam.fit, test) - test$AHI)^2))
+  sqrt(mean((predict.glm(lo.fit, test) - test$AHI)^2)),
+  sqrt(mean((predict.glm(gam.fit, test) - test$AHI)^2))
 )
-
 mae <- c(
   mean(abs(mean(train$AHI) - test$AHI)),
   mean(abs(predict(lm.fit, test) - test$AHI)),
@@ -217,16 +212,24 @@ mae <- c(
   mean(abs(predict(pol.fit, test) - test$AHI)),
   mean(abs(predict(ns.fit, test) - test$AHI)),
   mean(abs(predict(ss.fit, test) - test$AHI)),
-  mean(abs(predict(lo.fit, test) - test$AHI)),
-  mean(abs(predict(gam.fit, test) - test$AHI))
-  
+  mean(abs(predict.glm(lo.fit, test) - test$AHI)),
+  mean(abs(predict.glm(gam.fit, test) - test$AHI))
 )
 
-plot(rmse, mae)
-
+names <- c(
+  'null', 'linear', 'ridge', 'lasso', 'PLS', 
+  'polynomial', 'natural splines', 'smooth splines', 'local', 'GAM'
+)
 # data.frame(tag = value, ..., row.names = NULL)
-# e <- data.frame(RMSE = rmse, MAE = mae)
-
+acc <- data.frame(rmse = rmse, mae = mae, row.names = names)
+xyplot(
+  x = rmse ~ mae, data = acc, groups = rownames(x = acc), 
+  auto.key = list(columns = 5)
+)
+xyplot(
+  x = rmse ~ mae, data = acc, subset = -1, groups = rownames(x = acc), 
+  auto.key = list(columns = 5)
+)
 # ggplot2::ggplot(data = e, mapping = aes(x = rmse, y = mae)) +
 #   geom_point(aes(color = as.factor(1:length(rmse))))
  
@@ -234,9 +237,7 @@ plot(rmse, mae)
 train.class <- subset(x = train, select = c(diagnosis, gender, age, neck, BMI))
 # binary classifier
 train.twoclass <- df %>% 
-  mutate(
-    diagnosis = as.character(diagnosis) # reset no. levels
-  ) %>% 
+  mutate(diagnosis = as.character(diagnosis)) %>% # reset no. levels
   dplyr::select(diagnosis, gender, age, neck, BMI) %>%
   filter(diagnosis == "normal" | diagnosis == "severe") %>% 
   mutate(diagnosis = as.factor(diagnosis))
@@ -273,14 +274,15 @@ qda.fit <- train(
   method = 'qda',
   metric = "ROC", trControl = ctrl
 )
-set.seed(4)
-# QDA + stepwise feature selection
-sqda.fit <- train(
-  form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
-  method = 'stepQDA',
-  # tuning parameters: maxvar (maximum #variables), direction (search direction)
-  metric = "ROC", trControl = ctrl
-)
+# set.seed(4)
+# # QDA + stepwise feature selection
+# sqda.fit <- train(
+#   form = diagnosis ~ gender * age * neck * BMI, data = train.twoclass,
+#   method = 'stepQDA',
+#   # tuning parameters: maxvar (maximum #variables), direction (search direction)
+#   metric = "ROC", tuneGrid = expand.grid(maxvar = 3:ncol(train), direction = 'both'),
+#   trControl = ctrl
+# )
 set.seed(5)
 # KNN
 knn.fit <- train(
@@ -291,10 +293,45 @@ knn.fit <- train(
 )
 trellis.par.set(name = caretTheme())
 plot(knn.fit, col = "darkblue")
+densityplot(knn.fit, pch = "|")
 # ggplot(knn.fit)
 cat(
   'The largest area under the ROC curve is', max(knn.fit[["results"]]$ROC),
-  'for the value of k =', knn.fit[["results"]]$k[which.max(knn.fit[["results"]]$ROC)]
+  'for the value of k =', 
+  knn.fit[["results"]]$k[which.max(knn.fit[["results"]]$ROC)], '\n'
+)
+set.seed(6)
+# Logistic regression
+lo.fit <- train(
+  form = diagnosis ~ gender + age + neck + BMI, data = train.twoclass,
+  method = 'gamLoess', # tuning parameter: span, degree
+  # preProcess = c("center", "scale"),
+  metric = "ROC", tuneGrid = expand.grid(span = seq(.1, 1, .05), degree = 1),
+  trControl = ctrl
+)
+trellis.par.set(name = caretTheme())
+plot(lo.fit, col = "darkblue")
+densityplot(lo.fit, pch = "|")
+cat(
+  'The largest area under the ROC curve is', max(lo.fit[["results"]]$ROC),
+  'for the value of span =', 
+  lo.fit[["results"]]$span[which.max(lo.fit[["results"]]$ROC)], '\n'
+)
+set.seed(7)
+# Splines
+spl.fit <- train(
+  form = diagnosis ~ gender + age + neck + BMI, data = train.twoclass,
+  method = 'gamSpline', # tuning parameter: df (Degrees of Freedom)
+  # preProcess = c("center", "scale"),
+  metric = "ROC", tuneLength = 20, trControl = ctrl
+)
+trellis.par.set(name = caretTheme())
+plot(spl.fit, col = "darkblue")
+densityplot(lo.fit, pch = "|")
+cat(
+  'The largest area under the ROC curve is', max(spl.fit[["results"]]$ROC),
+  'for the value of df =', 
+  spl.fit[["results"]]$df[which.max(spl.fit[["results"]]$ROC)], '\n'
 )
 
 # comparison
@@ -302,8 +339,10 @@ rs <- resamples(x = list(
   logreg = glm.fit,
   lda = lda.fit,
   qda = qda.fit,
-  stepqda = sqda.fit,
-  knn = knn.fit
+  # stepqda = sqda.fit,
+  knn = knn.fit,
+  loess = lo.fit,
+  spline = spl.fit
 ))
 summary(rs)
 
@@ -331,8 +370,10 @@ sens <- c(
   glm.fit[["results"]]$Sens,
   lda.fit[["results"]]$Sens,
   qda.fit[["results"]]$Sens,
-  sqda.fit[["results"]]$Sens,
-  knn.fit[["results"]]$Sens[which.max(knn.fit[["results"]]$ROC)]
+  # sqda.fit[["results"]]$Sens,
+  knn.fit[["results"]]$Sens[which.max(knn.fit[["results"]]$ROC)],
+  lo.fit[["results"]]$Sens[which.max(lo.fit[["results"]]$ROC)],
+  spl.fit[["results"]]$Sens[which.max(spl.fit[["results"]]$ROC)]
 )
 # specificity is the percentage of non-defaulters that are correctly identified
 # spec <- c(
@@ -343,11 +384,18 @@ spec <- c(
   glm.fit[["results"]]$Spec,
   lda.fit[["results"]]$Spec,
   qda.fit[["results"]]$Spec,
-  sqda.fit[["results"]]$Spec,
-  knn.fit[["results"]]$Spec[which.max(knn.fit[["results"]]$ROC)]
+  # sqda.fit[["results"]]$Spec,
+  knn.fit[["results"]]$Spec[which.max(knn.fit[["results"]]$ROC)],
+  lo.fit[["results"]]$Spec[which.max(lo.fit[["results"]]$ROC)],
+  spl.fit[["results"]]$Spec[which.max(spl.fit[["results"]]$ROC)]
 )
 
-plot(x = sens,y = spec)
+names <- c('logistic', 'lda', 'qda', 'knn', 'local', 'splines')
+ratio <- data.frame(sens = sens, spec = spec, row.names = names)
+xyplot(
+  x = sens ~ spec, data = ratio, groups = rownames(x = ratio), 
+  auto.key = list(columns = 6)
+)
 
 # ## KNN
 # the KNN classifier predicts the class of a given test observation by identifying
