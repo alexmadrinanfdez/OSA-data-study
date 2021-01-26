@@ -14,6 +14,9 @@ library(pls)     # partial least squares and principal component regression
 library(caret)   # classification and regression training
 library(klaR)    # classification and visualization
 library(gam)     # generalized additive models
+library(tree)    # classification and regression trees
+library(randomForest) # Breiman and Cutler's random forests for classification and regression
+library(gbm)     # generalized boosted regression models
 
 source(file = 'fun.R')
 
@@ -65,7 +68,7 @@ for (i in 1:k) {
   }
 }
 cv.error <- apply(X = cv.error, MARGIN = 2, FUN = mean) # to columns
-plot(x = cv.error, type = "b", xlab = 'no. of variables', ylab = 'MSE')
+plot(x = cv.error, type = "b", xlab = 'no. variables', ylab = 'MSE')
 points(
   x = which.min(cv.error), y = cv.error[which.min(cv.error)],
   col = "red", pch = 20
@@ -188,6 +191,57 @@ gam.fit <- gam(AHI ~ lo(age, BMI) + s(neck) + neck:BMI:gender, data = train.reg)
 # library(akima) to plot two-dimensional surface
 # plot(gam.fit)
 
+# trees
+tree <- tree( # trees cannot handle interaction terms
+  formula = AHI ~ ., data = train.reg 
+)
+cv.tree <- cv.tree(object = tree) # pruning based on deviance
+plot(
+  x = cv.tree$size, y = cv.tree$dev, type = "b", 
+  xlab = 'no. terminal nodes', ylab = 'RSE'
+)
+points(
+  x = cv.tree$size[which.min(cv.tree$dev)], y = min(cv.tree$dev),
+  col = "red", pch = 20
+)
+tree <- prune.tree(tree = tree, best = cv.tree$size[which.min(cv.tree$dev)])
+
+# bagging
+bag.fit <- randomForest( # ntree = 500
+  formula = AHI ~ ., data = train.reg,
+  mtry = ncol(train.reg) - 1, importance = TRUE
+)
+importance(bag.fit)
+varImpPlot(bag.fit)
+
+# random forest
+rf.fit <- randomForest( # mtry = p/3 (for regression)
+  formula = AHI ~ ., data = train.reg, importance = TRUE
+)
+importance(rf.fit)
+varImpPlot(rf.fit)
+
+# boosting
+set.seed(6)
+k <- 10
+cv.error <- rep(x = 0, times = k)
+for (i in 1:k) {
+  fit <- gbm(
+    formula = AHI ~ ., distribution = "gaussian", data = train.reg[folds != i,],
+    n.trees = i * 100
+  )
+  pred <- predict(object = fit, newdata = train.reg[folds == i,])
+  cv.error[i] <- mean((train.reg$AHI[folds == i] - pred)^2)
+}
+plot(x = 1:10 * 100, y = cv.error, type = "b", xlab = 'no. trees', ylab = 'MSE')
+points(
+  x = which.min(cv.error) * 100, y = min(cv.error),
+  col = "red", pch = 20
+)
+# n.trees = 100, interaction.depth = 1, shrinkage = 0.1
+boo.fit <- gbm(formula = AHI ~ ., distribution = "gaussian", data = train.reg)
+summary(boo.fit)
+
 # test set
 xt <- model.matrix(object = AHI ~ age * neck * BMI * gender, data = test)[,-1] # glmnet
 
@@ -201,7 +255,11 @@ rmse <- c(
   sqrt(mean((predict(ns.fit, test) - test$AHI)^2)),
   sqrt(mean((predict(ss.fit, test) - test$AHI)^2)),
   sqrt(mean((predict.glm(lo.fit, test) - test$AHI)^2)),
-  sqrt(mean((predict.glm(gam.fit, test) - test$AHI)^2))
+  sqrt(mean((predict.glm(gam.fit, test) - test$AHI)^2)),
+  sqrt(mean((predict(tree, test) - test$AHI)^2)),
+  sqrt(mean((predict(bag.fit, test) - test$AHI)^2)),
+  sqrt(mean((predict(rf.fit, test) - test$AHI)^2)),
+  sqrt(mean((predict(boo.fit, test) - test$AHI)^2))
 )
 mae <- c(
   mean(abs(mean(train$AHI) - test$AHI)),
@@ -213,12 +271,17 @@ mae <- c(
   mean(abs(predict(ns.fit, test) - test$AHI)),
   mean(abs(predict(ss.fit, test) - test$AHI)),
   mean(abs(predict.glm(lo.fit, test) - test$AHI)),
-  mean(abs(predict.glm(gam.fit, test) - test$AHI))
+  mean(abs(predict.glm(gam.fit, test) - test$AHI)),
+  mean(abs(predict(tree, test) - test$AHI)),
+  mean(abs(predict(bag.fit, test) - test$AHI)),
+  mean(abs(predict(rf.fit, test) - test$AHI)),
+  mean(abs(predict(boo.fit, test) - test$AHI))
 )
 
 names <- c(
   'null', 'linear', 'ridge', 'lasso', 'PLS', 
-  'polynomial', 'natural splines', 'smooth splines', 'local', 'GAM'
+  'polynomial', 'natural splines', 'smooth splines', 'local', 'GAM',
+  'tree', 'bagging', 'forest', 'boosting'
 )
 # data.frame(tag = value, ..., row.names = NULL)
 acc <- data.frame(rmse = rmse, mae = mae, row.names = names)
@@ -230,9 +293,10 @@ xyplot(
   x = rmse ~ mae, data = acc, subset = -1, groups = rownames(x = acc), 
   auto.key = list(columns = 5)
 )
-# ggplot2::ggplot(data = e, mapping = aes(x = rmse, y = mae)) +
-#   geom_point(aes(color = as.factor(1:length(rmse))))
+ggplot2::ggplot(data = acc[-1,], mapping = aes(x = mae, y = rmse)) +
+   geom_point(aes(color = names[-1]))
  
+
 # classification
 train.class <- subset(x = train, select = c(diagnosis, gender, age, neck, BMI))
 # binary classifier
@@ -396,31 +460,3 @@ xyplot(
   x = sens ~ spec, data = ratio, groups = rownames(x = ratio), 
   auto.key = list(columns = 6)
 )
-
-# ## KNN
-# the KNN classifier predicts the class of a given test observation by identifying
-# the observations that are nearest to it, the scale of the variables matters
-# standardized.df <- scale(df.class[-1]) # zero mean and unit variance
-# knn(train, test, cl, k = 1, l = 0, prob = FALSE, use.all = TRUE)
-# knn.cv(train, cl, k = 1, l = 0, prob = FALSE, use.all = TRUE)
-# knn1(train, test, cl)
-# knn1(
-#   train = df.class[c(3:6, 9)],
-#   test = df.class[c(3:6, 9)],
-#   cl = df.class$diagnosis
-# )
-#
-# # example with naive bayes
-# # load the library
-# library(caret)
-# # load the iris dataset
-# data(iris)
-# # define training control
-# train_control <- trainControl(method="cv", number=10)
-# # fix the parameters of the algorithm
-# grid <- expand.grid(.fL=c(0), .usekernel=c(FALSE))
-# # train the model
-# model <- train(Species~., data=iris, trControl=train_control, method="nb", tuneGrid=grid)
-# # summarize results
-# print(model)
-# 

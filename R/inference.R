@@ -12,6 +12,7 @@ library(pls)     # partial least squares and principal component regression
 library(boot)    # bootstrap functions (originally by Angelo Canty for S)
 library(ggplot2) # create data visualisations using the Grammar of Graphics 
 library(splines) # regression spline functions and classes
+library(tree)    # classification and regression trees
 
 source(file = 'fun.R')
 
@@ -168,7 +169,7 @@ r.sq.t <- c(
 )
 
 op <- par(mfrow = c(1, 3))
-plot( # residual standard error (deviation)
+plot( # residual standard error (deviance)
   x = sigma$x, ylim = c(15, 25),
   type = "b", xaxt = "n", ylab = 'RSE', xlab = '', 
   pch = 7, col = 1:8, lty = 2
@@ -585,6 +586,14 @@ legend(
   col = c("darkblue", "darkred", "darkgreen"), lwd = 2, cex = .8
 )
 
+# decision trees
+tree.fit <- tree(formula = AHI ~ ., data = df.reg)
+summary(tree.fit)
+plot(x = tree.fit)
+text(x = tree.fit, pretty = 0)
+
+mean((predict(object = tree.fit) - df.reg$AHI)^2) # MSE
+
 # lattice::rfs(model = )
 
 # classification
@@ -745,8 +754,36 @@ sum(df.class$diagnosis[-train] == "severe")
 # quadratic discriminant analysis
 # Uses a QR decomposition which will give an error message 
 # if the within-group variance is singular for any group
-qda.fit <- qda(formula = diagnosis ~ weight + height + age + neck + BMI ,data = df.class.m)
+qda.fit <- qda(
+  formula = diagnosis ~ weight + height + age + neck + BMI ,data = df.class.m
+)
 
 # k-nearest neighbors
 # can't be used for inference
 # has no parameters
+#
+# the KNN classifier predicts the class of a given test observation by identifying
+# the observations that are nearest to it, the scale of the variables matters
+# standardized.df <- scale(df.class[-1]) # zero mean and unit variance
+# knn(train, test, cl, k = 1, l = 0, prob = FALSE, use.all = TRUE)
+# knn.cv(train, cl, k = 1, l = 0, prob = FALSE, use.all = TRUE)
+# knn1(train, test, cl)
+# knn1(
+#   train = df.class[c(3:6, 9)],
+#   test = df.class[c(3:6, 9)],
+#   cl = df.class$diagnosis
+# )
+
+# decision trees
+tree.fit <- tree(
+  formula = diagnosis ~ gender + age + BMI, data = df.class, subset = train
+)
+
+plot(x = tree.fit)             # shape of the tree
+text(x = tree.fit, pretty = 0) # decision in each split
+
+tree.pred <- predict(
+  object = tree.fit, newdata = df.class[-train,], type = "class"
+)
+table(predicted = tree.pred, true = df.class$diagnosis[-train])
+mean(tree.pred == df.class$diagnosis[-train])
